@@ -1,3 +1,7 @@
+// Copyright (c) 2026 The SS256 developers
+// Distributed under the MIT/X11 software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <winternl.h>
