@@ -10,6 +10,7 @@
 #include <iostream>
 #include "common.h"
 #include "debugger.h"
+#include "checkopenhandles.h"
 #include "../GuardianCore.dll/structure.h"
 
 HWND g_hWnd = nullptr;
@@ -101,6 +102,7 @@ static void PipeServerThread() {
 
                 COLORREF logColor = RGB(200, 200, 200);
                 std::string debugger = RunDebuggerForensics(alert.targetPid);
+                std::string handles = CheckOpenHandles(alert.targetPid);
 
                 if (alert.type == AlertType::MemoryRead) {
                     logColor = RGB(255, 80, 80);
@@ -110,7 +112,8 @@ static void PipeServerThread() {
                        << L"  „¥„Ÿ Address    : 0x" << std::hex << alert.baseAddress << std::dec << L"\n"
                        << L"  „¥„Ÿ Size       : " << alert.bufferSize << L" Bytes\n"
                        << L"  „¥„Ÿ Hex        : " << std::hex << ToHexString(alert.buf, sizeof(alert.buf) < alert.bufferSize ? sizeof(alert.buf): alert.bufferSize).c_str() << std::dec << L"\n"
-                       << L"  „¤„Ÿ Debugger   : " << debugger.c_str() << L"\n\n";
+                       << L"  „¥„Ÿ Debugger   : " << debugger.c_str() << L"\n"
+                       << L"  „¤„Ÿ Handles    :"  << handles.c_str() << L"\n\n";
                 }
                 else if (alert.type == AlertType::ProcessOpen) {
                     logColor = RGB(255, 180, 0);
@@ -118,7 +121,8 @@ static void PipeServerThread() {
                        << L"  „¥„Ÿ Source PID : " << alert.sourcePid << " (" << GetProcessNameFromPID(alert.sourcePid).c_str() << L") \n"
                        << L"  „¥„Ÿ Target PID : " << alert.targetPid << " (" << GetProcessNameFromPID(alert.targetPid).c_str() << L") \n"
                        << L"  „¥„Ÿ Access     : 0x" << std::hex << alert.desiredAccess << std::dec << L"\n"
-                       << L"  „¤„Ÿ Debugger   : " << debugger.c_str() << L"\n\n";
+                       << L"  „¥„Ÿ Debugger   : " << debugger.c_str() << L"\n"
+                       << L"  „¤„Ÿ Handles    : " << handles.c_str() << L"\n\n";
                 }
                 else if (alert.type == AlertType::CommonMapView) {
                     logColor = RGB(255, 180, 0);
@@ -127,7 +131,8 @@ static void PipeServerThread() {
                        << L"  „¥„Ÿ Mapped Addr : 0x" << std::hex << alert.baseAddress << std::dec << L"\n"
                        << L"  „¥„Ÿ View Size   : " << std::dec << alert.bufferSize << " Bytes\n"
                        << L"  „¥„Ÿ Data Peek   : " << std::hex << ToHexString(alert.buf, sizeof(alert.buf) < alert.bufferSize ? sizeof(alert.buf) : alert.bufferSize).c_str() << std::dec << L"\n"
-                       << L"  „¤„Ÿ Debugger   : " << debugger.c_str() << L"\n\n";
+                       << L"  „¥„Ÿ Debugger    : " << debugger.c_str() << L"\n"
+                       << L"  „¤„Ÿ Handles     : " << handles.c_str() << L"\n\n";
                 }
                 else if (alert.type == AlertType::DuplicateObject) {
                     logColor = RGB(255, 180, 0);
@@ -135,7 +140,8 @@ static void PipeServerThread() {
                        << L"  „¥„Ÿ Source PID    : " << alert.sourcePid << " (" << GetProcessNameFromPID(alert.sourcePid).c_str() << L") \n"
                        << L"  „¥„Ÿ DesiredAccess : 0x" << std::hex << alert.desiredAccess << "\n"
                        << L"  „¥„Ÿ Stolen Handle : 0x" << alert.targetPid << " (" << GetProcessNameFromPID(alert.targetPid).c_str() << L") \n"
-                       << L"  „¤„Ÿ Debugger   : " << debugger.c_str() << L"\n\n";
+                       << L"  „¥„Ÿ Debugger      : " << debugger.c_str() << L"\n"
+                       << L"  „¤„Ÿ Handles       : " << handles.c_str() << L"\n\n";
                 } else
                     return;
 
@@ -409,7 +415,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.1",
+        L"AI Agent Memory Checker v1.2",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 695, 520,
         nullptr, nullptr, hInstance, nullptr
