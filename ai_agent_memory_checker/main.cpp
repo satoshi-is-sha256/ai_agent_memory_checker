@@ -7,11 +7,42 @@
 #include <sstream>
 #include <iomanip>
 #include <thread>
+#include <iostream>
 #include "common.h"
+#include "debugger.h"
 #include "../GuardianCore.dll/structure.h"
 
 HWND g_hWnd = nullptr;
 bool g_thread = false;
+
+static std::string RunDebuggerForensics(DWORD targetProcessId) {
+    std::ostringstream stream;
+    stream << "[*] Starting Debugger Forensics for PID: " << targetProcessId << std::endl;
+
+    HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, targetProcessId);
+    if (!hProcess) {
+        stream << "[-] Failed to open target process. Error: " << GetLastError() << std::endl;
+        return stream.str();
+    }
+
+    bool standardDbg = CheckStandardDebugger(hProcess);
+    bool portDbg = CheckDebugPort(hProcess);
+    bool objectDbg = CheckDebugObject(hProcess);
+
+    stream << "----------------------------------------" << std::endl;
+    stream << " [Check 1] Standard Remote Debugger : " << (standardDbg ? "[DETECTED]" : "Clean") << std::endl;
+    stream << " [Check 2] Native Debug Port (7)    : " << (portDbg ? "[DETECTED]" : "Clean") << std::endl;
+    stream << " [Check 3] Debug Object Handle (30) : " << (objectDbg ? "[DETECTED]" : "Clean") << std::endl;
+    stream << "----------------------------------------" << std::endl;
+
+    if (standardDbg || portDbg || objectDbg)
+        std::cout << "[!] WARNING: External debugging / memory inspection mechanism detected!" << std::endl;
+    else
+        std::cout << "[+] No active debugger hooks found via these vectors." << std::endl;
+
+    CloseHandle(hProcess);
+    return stream.str();
+}
 
 static std::string GetProcessNameFromPID(DWORD processId) {
     if (processId == 0) return "System Idle Process";
@@ -69,6 +100,7 @@ static void PipeServerThread() {
                     << std::setw(2) << st.wMinute << L":" << std::setw(2) << st.wSecond << L"] ";
 
                 COLORREF logColor = RGB(200, 200, 200);
+                std::string debugger = RunDebuggerForensics(alert.targetPid);
 
                 if (alert.type == AlertType::MemoryRead) {
                     logColor = RGB(255, 80, 80);
@@ -77,14 +109,16 @@ static void PipeServerThread() {
                        << L"  „¥„Ÿ Target PID : " << alert.targetPid << " (" << GetProcessNameFromPID(alert.targetPid).c_str() << L") \n"
                        << L"  „¥„Ÿ Address    : 0x" << std::hex << alert.baseAddress << std::dec << L"\n"
                        << L"  „¥„Ÿ Size       : " << alert.bufferSize << L" Bytes\n"
-                       << L"  „¤„Ÿ Hex        : " << std::hex << ToHexString(alert.buf, sizeof(alert.buf) < alert.bufferSize ? sizeof(alert.buf): alert.bufferSize).c_str() << std::dec << L"\n\n";
+                       << L"  „¥„Ÿ Hex        : " << std::hex << ToHexString(alert.buf, sizeof(alert.buf) < alert.bufferSize ? sizeof(alert.buf): alert.bufferSize).c_str() << std::dec << L"\n"
+                       << L"  „¤„Ÿ Debugger   : " << debugger.c_str() << L"\n\n";
                 }
                 else if (alert.type == AlertType::ProcessOpen) {
                     logColor = RGB(255, 180, 0);
                     ss << L"[WARN: Process Handle Opened]\n"
                        << L"  „¥„Ÿ Source PID : " << alert.sourcePid << " (" << GetProcessNameFromPID(alert.sourcePid).c_str() << L") \n"
                        << L"  „¥„Ÿ Target PID : " << alert.targetPid << " (" << GetProcessNameFromPID(alert.targetPid).c_str() << L") \n"
-                       << L"  „¤„Ÿ Access     : 0x" << std::hex << alert.desiredAccess << std::dec << L"\n\n";
+                       << L"  „¥„Ÿ Access     : 0x" << std::hex << alert.desiredAccess << std::dec << L"\n"
+                       << L"  „¤„Ÿ Debugger   : " << debugger.c_str() << L"\n\n";
                 }
                 else if (alert.type == AlertType::CommonMapView) {
                     logColor = RGB(255, 180, 0);
@@ -92,14 +126,16 @@ static void PipeServerThread() {
                        << L"  „¥„Ÿ Target PID  : " << alert.targetPid << " (" << GetProcessNameFromPID(alert.targetPid).c_str() << L") \n"
                        << L"  „¥„Ÿ Mapped Addr : 0x" << std::hex << alert.baseAddress << std::dec << L"\n"
                        << L"  „¥„Ÿ View Size   : " << std::dec << alert.bufferSize << " Bytes\n"
-                       << L"  „¤„Ÿ Data Peek   : " << std::hex << ToHexString(alert.buf, sizeof(alert.buf) < alert.bufferSize ? sizeof(alert.buf) : alert.bufferSize).c_str() << std::dec << L"\n\n";
+                       << L"  „¥„Ÿ Data Peek   : " << std::hex << ToHexString(alert.buf, sizeof(alert.buf) < alert.bufferSize ? sizeof(alert.buf) : alert.bufferSize).c_str() << std::dec << L"\n"
+                       << L"  „¤„Ÿ Debugger   : " << debugger.c_str() << L"\n\n";
                 }
                 else if (alert.type == AlertType::DuplicateObject) {
                     logColor = RGB(255, 180, 0);
                     ss << L"[WARN: Foreign Handle Duplicated]\n"
                        << L"  „¥„Ÿ Source PID    : " << alert.sourcePid << " (" << GetProcessNameFromPID(alert.sourcePid).c_str() << L") \n"
                        << L"  „¥„Ÿ DesiredAccess : 0x" << std::hex << alert.desiredAccess << "\n"
-                       << L"  „¤„Ÿ Stolen Handle : 0x" << alert.targetPid << " (" << GetProcessNameFromPID(alert.targetPid).c_str() << L") \n\n";
+                       << L"  „¥„Ÿ Stolen Handle : 0x" << alert.targetPid << " (" << GetProcessNameFromPID(alert.targetPid).c_str() << L") \n"
+                       << L"  „¤„Ÿ Debugger   : " << debugger.c_str() << L"\n\n";
                 } else
                     return;
 
@@ -373,7 +409,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.0",
+        L"AI Agent Memory Checker v1.1",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 695, 520,
         nullptr, nullptr, hInstance, nullptr
