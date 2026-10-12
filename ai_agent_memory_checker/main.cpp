@@ -63,12 +63,34 @@ static std::string GetProcessNameFromPID(DWORD processId) {
         size_t lastSlash = fullPath.find_last_of(L"\\/");
         if (lastSlash != std::wstring::npos) {
             std::wstring fileName = fullPath.substr(lastSlash + 1);
-            processName = std::string(fileName.begin(), fileName.end());
+            processName = WStringToString(fileName);
         }
     }
 
     CloseHandle(hProcess);
     return processName;
+}
+
+static std::string GetProcessNameFromPID2(DWORD pid) {
+    if (pid == 0) return "System / Idle";
+
+    std::wstring procName = L"Unknown";
+    HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (hSnap != INVALID_HANDLE_VALUE) {
+        PROCESSENTRY32W pe;
+        pe.dwSize = sizeof(pe);
+        if (Process32FirstW(hSnap, &pe)) {
+            do {
+                if (pe.th32ProcessID == pid) {
+                    procName = pe.szExeFile;
+                    break;
+                }
+            } while (Process32NextW(hSnap, &pe));
+        }
+        CloseHandle(hSnap);
+    }
+
+    return WStringToString(procName);
 }
 
 static void PipeServerThread() {
