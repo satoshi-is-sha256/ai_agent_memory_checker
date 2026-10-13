@@ -93,6 +93,79 @@ static std::string GetProcessNameFromPID2(DWORD pid) {
     return WStringToString(procName);
 }
 
+static std::string ScanSystemMemoryAccess() {
+    std::ostringstream ss;
+    ss << "[*] Starting ScanSystemMemoryAccess." << std::endl;
+    HMODULE hNtdll = GetModuleHandleW(L"ntdll.dll");
+    if (!hNtdll) return ss.str();
+
+    auto NtQuerySysInfo = reinterpret_cast<pfnNtQuerySystemInformation>(GetProcAddress(hNtdll, "NtQuerySystemInformation"));
+    if (!NtQuerySysInfo) return ss.str();
+
+    ULONG bufferSize = 0x10000;
+    PVOID buffer = nullptr;
+    NTSTATUS status = 0;
+    do {
+        if (buffer) VirtualFree(buffer, 0, MEM_RELEASE);
+        buffer = VirtualAlloc(nullptr, bufferSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+        if (!buffer) return ss.str();
+
+        status = NtQuerySysInfo(SystemHandleInformation, buffer, bufferSize, &bufferSize);
+        if (status == STATUS_INFO_LENGTH_MISMATCH)
+            bufferSize *= 2;
+    } while (status == STATUS_INFO_LENGTH_MISMATCH);
+
+    if (!NT_SUCCESS(status)) {
+        if (buffer) VirtualFree(buffer, 0, MEM_RELEASE);
+        ss << "[-] NtQuerySystemInformation failed." << std::endl;
+        return ss.str();
+    }
+
+    const auto *handleInfo = reinterpret_cast<PSYSTEM_HANDLE_INFORMATION>(buffer);
+    ss << "[+] Total system handles to inspect: " << handleInfo->NumberOfHandles << std::endl;
+
+    for (ULONG i = 0; i < handleInfo->NumberOfHandles; ++i) {
+        const auto &entry = handleInfo->Handles[i];
+
+        DWORD sourcePid = entry.UniqueProcessId;
+        HANDLE hRemoteHandle = reinterpret_cast<HANDLE>(entry.HandleValue);
+        ULONG grantedAccess = entry.GrantedAccess;
+        if (sourcePid == 0 || sourcePid == 4) continue;
+
+        HANDLE hTargetProcess = OpenProcess(PROCESS_DUP_HANDLE | PROCESS_QUERY_INFORMATION, FALSE, sourcePid);
+        if (!hTargetProcess) continue;
+
+        std::string typeName, objectName;
+        if (GetHandleDetails(hTargetProcess, hRemoteHandle, typeName, objectName)) {
+            if (typeName == "Process") {
+                if ((grantedAccess & PROCESS_VM_READ) || (grantedAccess & 0x1F0FFF)) {
+                    HANDLE hLocalDuplicate = nullptr;
+                    if (DuplicateHandle(hTargetProcess, hRemoteHandle, GetCurrentProcess(), &hLocalDuplicate, 0, FALSE, DUPLICATE_SAME_ACCESS)) {
+                        DWORD targetPid = GetProcessId(hLocalDuplicate);
+                        CloseHandle(hLocalDuplicate);
+
+                        if (targetPid != 0 && targetPid != sourcePid) {
+                            std::string sourceName = GetProcessNameFromPID2(sourcePid);
+                            std::string targetName = GetProcessNameFromPID2(targetPid);
+
+                            ss << "[!] Cross-Process Memory Access Detected!" << std::endl;
+                            ss << "    -> Source: PID " << sourcePid << " (" << sourceName << ")" << std::endl;
+                            ss << "    -> Target: PID " << targetPid << " (" << targetName << ")" << std::endl;
+                            ss << "    -> Access Rights: 0x" << std::hex << grantedAccess << std::dec << std::endl;
+                            ss << "--------------------------------------------------" << std::endl;
+                        }
+                    }
+                }
+            }
+        }
+
+        CloseHandle(hTargetProcess);
+    }
+
+    VirtualFree(buffer, 0, MEM_RELEASE);
+    return ss.str();
+}
+
 static void PipeServerThread() {
     while (g_thread) {
         HANDLE hPipe = CreateNamedPipeW(
@@ -125,6 +198,7 @@ static void PipeServerThread() {
                 COLORREF logColor = RGB(200, 200, 200);
                 std::string debugger = RunDebuggerForensics(alert.targetPid);
                 std::string handles = CheckOpenHandles(alert.targetPid);
+                std::string scansystem_memory = ScanSystemMemoryAccess();
 
                 if (alert.type == AlertType::MemoryRead) {
                     logColor = RGB(255, 80, 80);
@@ -135,7 +209,8 @@ static void PipeServerThread() {
                        << L"  „¥„Ÿ Size       : " << alert.bufferSize << L" Bytes\n"
                        << L"  „¥„Ÿ Hex        : " << std::hex << ToHexString(alert.buf, sizeof(alert.buf) < alert.bufferSize ? sizeof(alert.buf): alert.bufferSize).c_str() << std::dec << L"\n"
                        << L"  „¥„Ÿ Debugger   : " << debugger.c_str() << L"\n"
-                       << L"  „¤„Ÿ Handles    : "  << handles.c_str() << L"\n\n";
+                       << L"  „¥„Ÿ Handles    : " << handles.c_str() << L"\n"
+                       << L"  „¤„Ÿ ScanMem    : " << scansystem_memory.c_str() << L"\n\n";
                 }
                 else if (alert.type == AlertType::ProcessOpen) {
                     logColor = RGB(255, 180, 0);
@@ -144,7 +219,8 @@ static void PipeServerThread() {
                        << L"  „¥„Ÿ Target PID : " << alert.targetPid << " (" << GetProcessNameFromPID(alert.targetPid).c_str() << L") \n"
                        << L"  „¥„Ÿ Access     : 0x" << std::hex << alert.desiredAccess << std::dec << L"\n"
                        << L"  „¥„Ÿ Debugger   : " << debugger.c_str() << L"\n"
-                       << L"  „¤„Ÿ Handles    : " << handles.c_str() << L"\n\n";
+                       << L"  „¥„Ÿ Handles    : " << handles.c_str() << L"\n"
+                       << L"  „¤„Ÿ ScanMem    : " << scansystem_memory.c_str() << L"\n\n";
                 }
                 else if (alert.type == AlertType::CommonMapView) {
                     logColor = RGB(255, 180, 0);
@@ -154,7 +230,8 @@ static void PipeServerThread() {
                        << L"  „¥„Ÿ View Size   : " << std::dec << alert.bufferSize << " Bytes\n"
                        << L"  „¥„Ÿ Data Peek   : " << std::hex << ToHexString(alert.buf, sizeof(alert.buf) < alert.bufferSize ? sizeof(alert.buf) : alert.bufferSize).c_str() << std::dec << L"\n"
                        << L"  „¥„Ÿ Debugger    : " << debugger.c_str() << L"\n"
-                       << L"  „¤„Ÿ Handles     : " << handles.c_str() << L"\n\n";
+                       << L"  „¥„Ÿ Handles     : " << handles.c_str() << L"\n"
+                       << L"  „¤„Ÿ ScanMem     : " << scansystem_memory.c_str() << L"\n\n";
                 }
                 else if (alert.type == AlertType::DuplicateObject) {
                     logColor = RGB(255, 180, 0);
@@ -163,7 +240,8 @@ static void PipeServerThread() {
                        << L"  „¥„Ÿ DesiredAccess : 0x" << std::hex << alert.desiredAccess << "\n"
                        << L"  „¥„Ÿ Stolen Handle : 0x" << alert.targetPid << " (" << GetProcessNameFromPID(alert.targetPid).c_str() << L") \n"
                        << L"  „¥„Ÿ Debugger      : " << debugger.c_str() << L"\n"
-                       << L"  „¤„Ÿ Handles       : " << handles.c_str() << L"\n\n";
+                       << L"  „¥„Ÿ Handles       : " << handles.c_str() << L"\n"
+                       << L"  „¤„Ÿ ScanMem       : " << scansystem_memory.c_str() << L"\n\n";
                 } else
                     return;
 
@@ -437,7 +515,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.2",
+        L"AI Agent Memory Checker v1.3",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 695, 520,
         nullptr, nullptr, hInstance, nullptr
