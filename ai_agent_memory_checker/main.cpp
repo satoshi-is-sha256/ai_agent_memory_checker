@@ -93,51 +93,6 @@ static std::string GetProcessNameFromPID2(DWORD pid) {
     return WStringToString(procName);
 }
 
-static std::string GetInfoHandles(DWORD targetProcessId) {
-    HMODULE mod = GetModuleHandleW(L"ntdll.dll");
-    if (!mod) return "[-] Failed to get module handle.";
-
-    ULONG bufferSize = 0x10000;
-    NTSTATUS status = STATUS_INFO_LENGTH_MISMATCH;
-    PVOID buffer = nullptr;
-    while (status == STATUS_INFO_LENGTH_MISMATCH) {
-        if (buffer) {
-            VirtualFree(buffer, 0, MEM_RELEASE);
-            buffer = nullptr;
-        }
-    
-        buffer = VirtualAlloc(nullptr, bufferSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-        if (!buffer) {
-            return "[-] Failed to allocate memory for system handles.";
-        }
-
-        status = NtQuerySystemInformation((SYSTEM_INFORMATION_CLASS)SystemHandleInformation, buffer, bufferSize, &bufferSize);
-    }
-
-    pfnNtQueryObject NtQueryObject = reinterpret_cast<pfnNtQueryObject>(GetProcAddress(mod, "NtQueryObject"));
-    PSYSTEM_HANDLE_INFORMATION handleInfo = (PSYSTEM_HANDLE_INFORMATION)buffer;
-    int suspiciousCount = 0;
-
-    std::ostringstream ss;
-    ss << "[*] Parsing handles and resolving target processes..." << "\n";
-    for (ULONG i = 0; i < handleInfo->NumberOfHandles; i++) {
-        const auto &handle = handleInfo->Handles[i];
-
-        if (handle.UniqueProcessId == targetProcessId) {
-            if (handle.GrantedAccess & 0x0010) {
-                suspiciousCount++;
-
-                ss << " [!] Target PID: " << targetProcessId << "\n"
-                   << " | Handle: 0xstd::hex" << handle.HandleValue << "\n"
-                   << " | Access: 0x" << handle.GrantedAccess << std::dec << "\n\n";
-            }
-        }
-    }
-
-    VirtualFree(buffer, 0, MEM_RELEASE);
-    return ss.str();
-}
-
 static void PipeServerThread() {
     while (g_thread) {
         HANDLE hPipe = CreateNamedPipeW(
@@ -180,7 +135,7 @@ static void PipeServerThread() {
                        << L"  „¥„Ÿ Size       : " << alert.bufferSize << L" Bytes\n"
                        << L"  „¥„Ÿ Hex        : " << std::hex << ToHexString(alert.buf, sizeof(alert.buf) < alert.bufferSize ? sizeof(alert.buf): alert.bufferSize).c_str() << std::dec << L"\n"
                        << L"  „¥„Ÿ Debugger   : " << debugger.c_str() << L"\n"
-                       << L"  „¤„Ÿ Handles    :"  << handles.c_str() << L"\n\n";
+                       << L"  „¤„Ÿ Handles    : "  << handles.c_str() << L"\n\n";
                 }
                 else if (alert.type == AlertType::ProcessOpen) {
                     logColor = RGB(255, 180, 0);

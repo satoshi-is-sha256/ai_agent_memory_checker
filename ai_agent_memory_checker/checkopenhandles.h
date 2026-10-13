@@ -11,6 +11,7 @@
 #include <winternl.h>
 #include <iostream>
 #include <vector>
+#include "../GuardianCore.dll/structure.h"
 
 constexpr DWORD STATUS_INFO_LENGTH_MISMATCH = 0xC0000004;
 
@@ -86,6 +87,55 @@ inline std::string CheckOpenHandles(DWORD targetProcessId) {
     if (buffer) VirtualFree(buffer, 0, MEM_RELEASE);
 
     return stream.str();
+}
+
+#ifndef ObjectNameInformation
+#define ObjectNameInformation ((OBJECT_INFORMATION_CLASS)1)
+#endif
+
+typedef struct _OBJECT_TYPE_INFORMATION {
+    UNICODE_STRING TypeName;
+    ULONG Reserved[16];
+} OBJECT_TYPE_INFORMATION, *POBJECT_TYPE_INFORMATION;
+
+typedef NTSTATUS(NTAPI *pfnNtQueryObject)(HANDLE Handle, OBJECT_INFORMATION_CLASS ObjectInformationClass, PVOID ObjectInformation, ULONG ObjectInformationLength, PULONG ReturnLength);
+
+inline bool GetHandleDetails(HANDLE hTargetProcess, HANDLE hRemoteHandle, std::string &outTypeName, std::string &outObjectName) {
+    HMODULE mod = GetModuleHandleW(L"ntdll.dll");
+    if (!mod) return false;
+
+    pfnNtQueryObject NtQueryObject = reinterpret_cast<pfnNtQueryObject>(GetProcAddress(mod, "NtQueryObject"));
+    if (!NtQueryObject) return false;
+
+    HANDLE hLocalHandle = nullptr;
+    if (!DuplicateHandle(hTargetProcess, hRemoteHandle, GetCurrentProcess(), &hLocalHandle, 0, FALSE, DUPLICATE_SAME_ACCESS)) 
+        return false;
+
+    BYTE typeBuffer[0x200] = { 0 };
+    ULONG returnLength = 0;
+    NTSTATUS status = NtQueryObject(hLocalHandle, (OBJECT_INFORMATION_CLASS)ObjectTypeInformation, typeBuffer, sizeof(typeBuffer), &returnLength);
+    if (NT_SUCCESS(status)) {
+        const auto *typeInfo = reinterpret_cast<POBJECT_TYPE_INFORMATION>(typeBuffer);
+        if (typeInfo->TypeName.Buffer) {
+            std::wstring outTypeNamew;
+            outTypeNamew.assign(typeInfo->TypeName.Buffer, typeInfo->TypeName.Length / sizeof(WCHAR));
+            outTypeName = WStringToString(outTypeNamew);
+        }
+    }
+
+    BYTE nameBuffer[0x1000] = { 0 };
+    status = NtQueryObject(hLocalHandle, ObjectNameInformation, nameBuffer, sizeof(nameBuffer), &returnLength);
+    if (NT_SUCCESS(status)) {
+        const auto *nameInfo = reinterpret_cast<POBJECT_NAME_INFORMATION>(nameBuffer);
+        if (nameInfo->Name.Buffer) {
+            std::wstring outObjectNamew;
+            outObjectNamew.assign(nameInfo->Name.Buffer, nameInfo->Name.Length / sizeof(WCHAR));
+            outObjectName = WStringToString(outObjectNamew);
+        }
+    }
+
+    CloseHandle(hLocalHandle);
+    return true;
 }
 
 #endif
