@@ -45,6 +45,20 @@ static std::string RunDebuggerForensics(DWORD targetProcessId) {
     return stream.str();
 }
 
+static std::string GetProcessFullPath(DWORD pid) {
+    std::string path = "Unknown";
+    HANDLE hProc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+    if (hProc) {
+        WCHAR buffer[MAX_PATH];
+        DWORD size = MAX_PATH;
+        if (QueryFullProcessImageNameW(hProc, 0, buffer, &size)) {
+            path = WStringToString(std::wstring(buffer));
+        }
+        CloseHandle(hProc);
+    }
+    return path;
+}
+
 static std::string GetProcessNameFromPID(DWORD processId) {
     if (processId == 0) return "System Idle Process";
     if (processId == 4) return "System";
@@ -124,7 +138,7 @@ static std::string ScanSystemMemoryAccess() {
     const auto *handleInfo = reinterpret_cast<PSYSTEM_HANDLE_INFORMATION>(buffer);
     ss << "[+] Total system handles to inspect: " << handleInfo->NumberOfHandles << std::endl;
 
-    const int limiter = 10;
+    const int limiter = 30;
     int counter = 0;
     for (ULONG i = 0; i < handleInfo->NumberOfHandles; ++i) {
         const auto &entry = handleInfo->Handles[i];
@@ -140,6 +154,55 @@ static std::string ScanSystemMemoryAccess() {
         std::string typeName, objectName;
         if (GetHandleDetails(hTargetProcess, hRemoteHandle, typeName, objectName)) {
             if (typeName == "Process") {
+
+                const bool canRead = (grantedAccess & PROCESS_VM_READ) != 0;
+                const bool canWrite = (grantedAccess & PROCESS_VM_WRITE) != 0;
+                const bool canOperate = (grantedAccess & PROCESS_VM_OPERATION) != 0;
+                const bool canCreateThread = (grantedAccess & PROCESS_CREATE_THREAD) != 0;
+                const bool isFullAccess = (grantedAccess & 0x1F0FFF) == 0x1F0FFF;
+
+                if (canRead || canWrite || canCreateThread || isFullAccess) {
+                    HANDLE hLocalDuplicate = nullptr;
+                    if (DuplicateHandle(hTargetProcess, hRemoteHandle, GetCurrentProcess(), &hLocalDuplicate, 0, FALSE, DUPLICATE_SAME_ACCESS)) {
+                        DWORD targetPid = GetProcessId(hLocalDuplicate);
+                        CloseHandle(hLocalDuplicate);
+
+                        if (targetPid != 0 && targetPid != sourcePid) {
+                            std::string sourceName = GetProcessNameFromPID2(sourcePid);
+                            std::string targetName = GetProcessNameFromPID2(targetPid);
+                            std::string sourcePath = GetProcessFullPath(sourcePid);
+
+                            std::string threatLevel = "[INFO / Normal]";
+                            if (isFullAccess || canCreateThread || canWrite) {
+                                threatLevel = "[!] [HIGH RISK] Potential Injection/Control!";
+                            } else if (canRead) {
+                                threatLevel = "[!] [MEDIUM RISK] Memory Read Access";
+                            }
+
+                            ss << threatLevel << std::endl;
+                            ss << "    -> Source: PID " << sourcePid << " (" << sourceName << ")" << std::endl;
+                            ss << "    -> Path:   " << sourcePath << std::endl;
+                            ss << "    -> Target: PID " << targetPid << " (" << targetName << ")" << std::endl;
+                            ss << "    -> Rights: 0x" << std::hex << grantedAccess << std::dec;
+
+                            std::wcout << L" [ ";
+                            if (isFullAccess) ss << "ALL_ACCESS ";
+                            if (canCreateThread) ss << "CREATE_THREAD ";
+                            if (canWrite) ss << "VM_WRITE ";
+                            if (canRead) ss << "VM_READ ";
+                            ss << "]" << std::endl;
+                
+                            ss << "--------------------------------------------------" << std::endl;
+
+                            if(counter++ == limiter) {
+                                CloseHandle(hTargetProcess);
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                /***
                 if ((grantedAccess & PROCESS_VM_READ) || (grantedAccess & 0x1F0FFF)) {
                     HANDLE hLocalDuplicate = nullptr;
                     if (DuplicateHandle(hTargetProcess, hRemoteHandle, GetCurrentProcess(), &hLocalDuplicate, 0, FALSE, DUPLICATE_SAME_ACCESS)) {
@@ -163,6 +226,7 @@ static std::string ScanSystemMemoryAccess() {
                         }
                     }
                 }
+                ***/
             }
         }
 
@@ -522,7 +586,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.3.4",
+        L"AI Agent Memory Checker v1.4",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 695, 520,
         nullptr, nullptr, hInstance, nullptr
