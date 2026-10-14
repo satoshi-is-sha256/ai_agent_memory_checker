@@ -124,6 +124,8 @@ static std::string ScanSystemMemoryAccess() {
     const auto *handleInfo = reinterpret_cast<PSYSTEM_HANDLE_INFORMATION>(buffer);
     ss << "[+] Total system handles to inspect: " << handleInfo->NumberOfHandles << std::endl;
 
+    const int limiter = 10;
+    int counter = 0;
     for (ULONG i = 0; i < handleInfo->NumberOfHandles; ++i) {
         const auto &entry = handleInfo->Handles[i];
 
@@ -153,6 +155,11 @@ static std::string ScanSystemMemoryAccess() {
                             ss << "    -> Target: PID " << targetPid << " (" << targetName << ")" << std::endl;
                             ss << "    -> Access Rights: 0x" << std::hex << grantedAccess << std::dec << std::endl;
                             ss << "--------------------------------------------------" << std::endl;
+
+                            if(counter++ == limiter) {
+                                CloseHandle(hTargetProcess);
+                                break;
+                            }
                         }
                     }
                 }
@@ -515,7 +522,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.3",
+        L"AI Agent Memory Checker v1.3.4",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 695, 520,
         nullptr, nullptr, hInstance, nullptr
