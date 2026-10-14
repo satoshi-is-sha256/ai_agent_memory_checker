@@ -8,6 +8,9 @@
 #include <iomanip>
 #include <thread>
 #include <iostream>
+#include <set>
+#include <chrono>
+#include <algorithm>
 #include "common.h"
 #include "debugger.h"
 #include "checkopenhandles.h"
@@ -107,6 +110,63 @@ static std::string GetProcessNameFromPID2(DWORD pid) {
     return WStringToString(procName);
 }
 
+struct HandleAccessRecord {
+    DWORD sourcePid;
+    DWORD targetPid;
+    DWORD accessRights;
+
+    HandleAccessRecord() {
+        sourcePid = 0;
+        targetPid = 0;
+        accessRights = 0;
+    }
+
+    bool operator<(const HandleAccessRecord &other) const {
+        if (sourcePid != other.sourcePid) return sourcePid < other.sourcePid;
+        if (targetPid != other.targetPid) return targetPid < other.targetPid;
+        return accessRights < other.accessRights;
+    }
+};
+
+static std::string GetCurrentTimestamp() {
+    auto now = std::chrono::system_clock::now();
+    auto in_time_t = std::chrono::system_clock::to_time_t(now);
+    std::stringstream ss;
+    struct tm buf;
+    localtime_s(&buf, &in_time_t);
+    ss << std::put_time(&buf, "%Y-%m-%d %H:%M:%S");
+    return ss.str();
+}
+
+static std::string ProcessScanResults(const std::vector<HandleAccessRecord> &currentScan) {
+    static std::set<HandleAccessRecord> g_previousHandles;
+
+    std::set<HandleAccessRecord> currentHandles(currentScan.begin(), currentScan.end());
+    std::set<HandleAccessRecord> newlyAdded;
+
+    std::set_difference(
+        currentHandles.begin(), currentHandles.end(),
+        g_previousHandles.begin(), g_previousHandles.end(),
+        std::inserter(newlyAdded, newlyAdded.end())
+    );
+
+    std::stringstream ss;
+    for (const auto &record : newlyAdded) {
+        std::string timestamp = GetCurrentTimestamp();
+        std::string sourceName = GetProcessNameFromPID2(record.sourcePid);
+        std::string targetName = GetProcessNameFromPID2(record.targetPid);
+
+        ss << "[" << timestamp << "] [!] [NEW ACCESS TRIGGERED]" << std::endl;
+        ss << "    -> Source: PID " << record.sourcePid << " (" << sourceName << ")" << std::endl;
+        ss << "    -> Target: PID " << record.targetPid << " (" << targetName << ")" << std::endl;
+        ss << "    -> Rights: 0x" << std::hex << record.accessRights << std::dec << std::endl;
+        ss << "--------------------------------------------------" << std::endl;
+    }
+
+    g_previousHandles = currentHandles;
+    return ss.str();
+}
+
 static std::string ScanSystemMemoryAccess() {
     std::ostringstream ss;
     ss << "[*] Starting ScanSystemMemoryAccess." << std::endl;
@@ -138,14 +198,16 @@ static std::string ScanSystemMemoryAccess() {
     const auto *handleInfo = reinterpret_cast<PSYSTEM_HANDLE_INFORMATION>(buffer);
     ss << "[+] Total system handles to inspect: " << handleInfo->NumberOfHandles << std::endl;
 
+    std::vector<HandleAccessRecord> currentScan;
     const int limiter = 30;
     int counter = 0;
     for (ULONG i = 0; i < handleInfo->NumberOfHandles; ++i) {
+        HandleAccessRecord handleRecord;
         const auto &entry = handleInfo->Handles[i];
 
-        DWORD sourcePid = entry.UniqueProcessId;
+        DWORD sourcePid = handleRecord.sourcePid = entry.UniqueProcessId;
         HANDLE hRemoteHandle = reinterpret_cast<HANDLE>(entry.HandleValue);
-        ULONG grantedAccess = entry.GrantedAccess;
+        ULONG grantedAccess = handleRecord.accessRights = entry.GrantedAccess;
         if (sourcePid == 0 || sourcePid == 4) continue;
 
         HANDLE hTargetProcess = OpenProcess(PROCESS_DUP_HANDLE | PROCESS_QUERY_INFORMATION, FALSE, sourcePid);
@@ -164,7 +226,7 @@ static std::string ScanSystemMemoryAccess() {
                 if (canRead || canWrite || canCreateThread || isFullAccess) {
                     HANDLE hLocalDuplicate = nullptr;
                     if (DuplicateHandle(hTargetProcess, hRemoteHandle, GetCurrentProcess(), &hLocalDuplicate, 0, FALSE, DUPLICATE_SAME_ACCESS)) {
-                        DWORD targetPid = GetProcessId(hLocalDuplicate);
+                        DWORD targetPid = handleRecord.targetPid = GetProcessId(hLocalDuplicate);
                         CloseHandle(hLocalDuplicate);
 
                         if (targetPid != 0 && targetPid != sourcePid) {
@@ -198,6 +260,7 @@ static std::string ScanSystemMemoryAccess() {
                                 CloseHandle(hTargetProcess);
                                 break;
                             }
+                            currentScan.push_back(handleRecord);
                         }
                     }
                 }
@@ -232,6 +295,8 @@ static std::string ScanSystemMemoryAccess() {
 
         CloseHandle(hTargetProcess);
     }
+
+    ss << ProcessScanResults(currentScan);
 
     VirtualFree(buffer, 0, MEM_RELEASE);
     return ss.str();
@@ -586,7 +651,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.4",
+        L"AI Agent Memory Checker v1.5",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 695, 520,
         nullptr, nullptr, hInstance, nullptr
