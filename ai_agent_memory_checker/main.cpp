@@ -14,6 +14,7 @@
 #include "common.h"
 #include "debugger.h"
 #include "checkopenhandles.h"
+#include "memorydetector.h"
 #include "../GuardianCore.dll/structure.h"
 
 HWND g_hWnd = nullptr;
@@ -164,6 +165,62 @@ static std::string ProcessScanResults(const std::vector<HandleAccessRecord> &cur
     }
 
     g_previousHandles = currentHandles;
+    return ss.str();
+}
+
+static std::string MemoryDetector(HWND hWnd, const std::vector<HandleAccessRecord> &currentScan) {
+    static std::set<HandleAccessRecord> g_previousHandles;
+    static bool g_isFirstScan = true;
+
+    std::ostringstream ss;
+    ss << "[*] Starting MemoryDetector." << std::endl;
+
+    std::set<HandleAccessRecord> currentHandles(currentScan.begin(), currentScan.end());
+    if (g_isFirstScan) {
+        g_previousHandles = currentHandles;
+        g_isFirstScan = false;
+        return ss.str();
+    }
+
+    std::set<HandleAccessRecord> newlyAdded;
+
+    std::set_difference(
+        currentHandles.begin(), currentHandles.end(),
+        g_previousHandles.begin(), g_previousHandles.end(),
+        std::inserter(newlyAdded, newlyAdded.end())
+    );
+
+    DWORD userSpecifiedPid = GetDlgItemInt(hWnd, IDC_PID_INPUT, nullptr, FALSE);
+    char process[MAX_PATH];
+    GetDlgItemTextA(hWnd, IDC_PROCESS_NAME_INPUT, process, MAX_PATH);
+    std::string userSpecifiedName = process;
+
+    for (const auto &record: newlyAdded) {
+        std::string sourceName = GetProcessNameFromPID2(record.sourcePid);
+        std::string targetName = GetProcessNameFromPID2(record.targetPid);
+        std::string sourcePath = GetProcessFullPath(record.sourcePid);
+
+        if (!IsTargetWatched(record.targetPid, userSpecifiedPid, targetName, userSpecifiedName)) {
+            continue;
+        }
+
+        bool canRead = (record.accessRights & PROCESS_VM_READ) != 0;
+        bool canWrite = (record.accessRights & PROCESS_VM_WRITE) != 0;
+        bool canCreateThread = (record.accessRights & PROCESS_CREATE_THREAD) != 0;
+
+        if (canRead || canWrite || canCreateThread) {
+            ss << "[!] [TARGET MEMORY ACCESS DETECTED]" << std::endl;
+            ss << "    -> Target: PID " << record.targetPid << " (" << targetName << ")" << std::endl;
+            ss << "    -> Sleuth: PID " << record.sourcePid << " (" << sourceName << ")" << std::endl;
+            ss << "    -> Path:   " << sourcePath << std::endl;
+            ss << "    -> Rights: 0x" << std::hex << record.accessRights << std::dec;
+        
+            if (canRead) ss << " [VM_READ (Memory Sucking?)]";
+            if (canWrite) ss << " [VM_WRITE]";
+            ss << std::endl << "--------------------------------------------------" << std::endl;
+        }
+    }
+
     return ss.str();
 }
 
