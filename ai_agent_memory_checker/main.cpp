@@ -354,6 +354,7 @@ static std::string ScanSystemMemoryAccess() {
     }
 
     ss << ProcessScanResults(currentScan);
+    ss << MemoryDetector(g_hWnd, currentScan);
 
     VirtualFree(buffer, 0, MEM_RELEASE);
     return ss.str();
@@ -708,7 +709,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.5",
+        L"AI Agent Memory Checker v1.6",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 695, 520,
         nullptr, nullptr, hInstance, nullptr
