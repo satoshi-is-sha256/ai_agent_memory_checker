@@ -2,22 +2,18 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include <string>
-#include <vector>
-#include <sstream>
+#include "common.h"
 #include <iomanip>
 #include <thread>
-#include <iostream>
 #include <set>
-#include <chrono>
 #include <algorithm>
-#include "common.h"
 #include "debugger.h"
 #include "checkopenhandles.h"
 #include "memorydetector.h"
-#include "../GuardianCore.dll/structure.h"
+#include "allsystemhandlesex.h"
 
 HWND g_hWnd = nullptr;
+HWND g_hEditProcessName = nullptr;
 bool g_thread = false;
 
 static std::string RunDebuggerForensics(DWORD targetProcessId) {
@@ -128,16 +124,6 @@ struct HandleAccessRecord {
         return accessRights < other.accessRights;
     }
 };
-
-static std::string GetCurrentTimestamp() {
-    auto now = std::chrono::system_clock::now();
-    auto in_time_t = std::chrono::system_clock::to_time_t(now);
-    std::stringstream ss;
-    struct tm buf;
-    localtime_s(&buf, &in_time_t);
-    ss << std::put_time(&buf, "%Y-%m-%d %H:%M:%S");
-    return ss.str();
-}
 
 static std::string ProcessScanResults(const std::vector<HandleAccessRecord> &currentScan) {
     static std::set<HandleAccessRecord> g_previousHandles;
@@ -389,6 +375,10 @@ static void PipeServerThread() {
                 ss << L"[" << std::setfill(L'0') << std::setw(2) << st.wHour << L":"
                     << std::setw(2) << st.wMinute << L":" << std::setw(2) << st.wSecond << L"] ";
 
+                wchar_t procNameBuf[256] = { 0 };
+                GetWindowTextW(g_hEditProcessName, procNameBuf, 256);
+                ss << InspectTargetHandles(std::wstring(procNameBuf)).c_str();
+
                 COLORREF logColor = RGB(200, 200, 200);
                 std::string debugger = RunDebuggerForensics(alert.targetPid);
                 std::string handles = CheckOpenHandles(alert.targetPid);
@@ -467,25 +457,6 @@ static void AppendLogText(HWND hRichEdit, const std::wstring &text, COLORREF col
     SendMessageW(hRichEdit, EM_SCROLLCARET, 0, 0);
 }
 
-static std::vector<DWORD> GetPidsByProcessName(const std::wstring &processName) {
-    std::vector<DWORD> pids;
-
-    HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-    if (hSnapshot == INVALID_HANDLE_VALUE) return pids;
-
-    PROCESSENTRY32W pe32 = { sizeof(PROCESSENTRY32W) };
-    if (Process32FirstW(hSnapshot, &pe32)) {
-        do {
-            if (_wcsicmp(pe32.szExeFile, processName.c_str()) == 0) {
-                pids.push_back(pe32.th32ProcessID);
-            }
-        } while (Process32NextW(hSnapshot, &pe32));
-    }
-
-    CloseHandle(hSnapshot);
-    return pids;
-}
-
 static bool InjectGuardianCore(DWORD targetPid, const wchar_t *dllPath) {
     HANDLE hProcess = OpenProcess(PROCESS_CREATE_THREAD | PROCESS_VM_OPERATION | PROCESS_VM_WRITE, FALSE, targetPid);
     if (!hProcess) return false;
@@ -525,13 +496,12 @@ static bool InjectGuardianCore(DWORD targetPid, const wchar_t *dllPath) {
 
 static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     static HWND hStatic = nullptr;
-    static HWND hEditProcessName = nullptr;
     static HWND hEditPid = nullptr;
     static HWND hBtnInject = nullptr;
     static HWND hBtnInjectAll = nullptr;
     static HWND hLogEdit = nullptr;
     auto InstanceCheck = []() {
-        return hStatic && hEditProcessName && hEditPid && hBtnInject && hBtnInjectAll && hLogEdit;
+        return hStatic && g_hEditProcessName && hEditPid && hBtnInject && hBtnInjectAll && hLogEdit;
     };
     auto DisableButton = []() {
         EnableWindow(hBtnInject, FALSE);
@@ -554,7 +524,7 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
             hWnd, (HMENU)IDC_PID_INPUT, nullptr, nullptr
         );
 
-        hEditProcessName = CreateWindowExW(
+        g_hEditProcessName = CreateWindowExW(
             WS_EX_CLIENTEDGE, L"EDIT", L"ChatGPT.exe",
             WS_VISIBLE | WS_CHILD | ES_AUTOHSCROLL,
             170, 12, 140, 25,
@@ -624,7 +594,7 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
         } 
         else if (LOWORD(wParam) == IDC_BTN_INJECT_ALL) {
             wchar_t procNameBuf[256] = { 0 };
-            GetWindowTextW(hEditProcessName, procNameBuf, 256);
+            GetWindowTextW(g_hEditProcessName, procNameBuf, 256);
 
             if (wcslen(procNameBuf) == 0) {
                 MessageBoxW(hWnd, L"Please enter a target process name (e.g. ChatGPT.exe).", L"Error", MB_OK | MB_ICONERROR);
@@ -709,7 +679,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.6",
+        L"AI Agent Memory Checker v1.7",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 695, 520,
         nullptr, nullptr, hInstance, nullptr

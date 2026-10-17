@@ -5,10 +5,7 @@
 #ifndef DEBUGGER_H
 #define DEBUGGER_H
 
-#include <Windows.h>
-#include <winternl.h>
-
-typedef NTSTATUS(NTAPI *pfnNtQueryInformationProcess)(HANDLE ProcessHandle, PROCESSINFOCLASS ProcessInformationClass, PVOID ProcessInformation, ULONG ProcessInformationLength, PULONG ReturnLength);
+#include "common.h"
 
 inline bool CheckStandardDebugger(HANDLE hProcess) {
     BOOL isDebuggerPresent = FALSE;

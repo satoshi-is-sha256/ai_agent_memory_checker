@@ -5,15 +5,7 @@
 #ifndef CHECKOPENHANDLES_H
 #define CHECKOPENHANDLES_H
 
-#define SystemHandleInformation 16
-
-#include <windows.h>
-#include <winternl.h>
-#include <iostream>
-#include <vector>
-#include "../GuardianCore.dll/structure.h"
-
-constexpr DWORD STATUS_INFO_LENGTH_MISMATCH = 0xC0000004;
+#include "common.h"
 
 typedef struct _SYSTEM_HANDLE_TABLE_ENTRY_INFO {
     USHORT UniqueProcessId;
@@ -30,7 +22,10 @@ typedef struct _SYSTEM_HANDLE_INFORMATION {
     SYSTEM_HANDLE_TABLE_ENTRY_INFO Handles[1];
 } SYSTEM_HANDLE_INFORMATION, *PSYSTEM_HANDLE_INFORMATION;
 
-typedef NTSTATUS(NTAPI *pfnNtQuerySystemInformation)(ULONG SystemInformationClass, PVOID SystemInformation, ULONG SystemInformationLength, PULONG ReturnLength);
+typedef struct _OBJECT_TYPE_INFORMATION {
+    UNICODE_STRING TypeName;
+    ULONG Reserved[16];
+} OBJECT_TYPE_INFORMATION, *POBJECT_TYPE_INFORMATION;
 
 inline std::string CheckOpenHandles(DWORD targetProcessId) {
     std::ostringstream stream;
@@ -88,17 +83,6 @@ inline std::string CheckOpenHandles(DWORD targetProcessId) {
 
     return stream.str();
 }
-
-#ifndef ObjectNameInformation
-#define ObjectNameInformation ((OBJECT_INFORMATION_CLASS)1)
-#endif
-
-typedef struct _OBJECT_TYPE_INFORMATION {
-    UNICODE_STRING TypeName;
-    ULONG Reserved[16];
-} OBJECT_TYPE_INFORMATION, *POBJECT_TYPE_INFORMATION;
-
-typedef NTSTATUS(NTAPI *pfnNtQueryObject)(HANDLE Handle, OBJECT_INFORMATION_CLASS ObjectInformationClass, PVOID ObjectInformation, ULONG ObjectInformationLength, PULONG ReturnLength);
 
 inline bool GetHandleDetails(HANDLE hTargetProcess, HANDLE hRemoteHandle, std::string &outTypeName, std::string &outObjectName) {
     HMODULE mod = GetModuleHandleW(L"ntdll.dll");

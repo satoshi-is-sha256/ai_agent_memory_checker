@@ -6,6 +6,8 @@
 #define STRUCTURE_H
 
 #include <Windows.h>
+#include <winternl.h>
+#include <string>
 
 #define GUARDIAN_PIPE_NAME L"\\\\.\\pipe\\AIAgentMemoryCheckerPipe"
 
