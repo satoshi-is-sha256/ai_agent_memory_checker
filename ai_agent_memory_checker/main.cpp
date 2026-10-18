@@ -348,6 +348,18 @@ static std::string ScanSystemMemoryAccess() {
 
 static void PipeServerThread() {
     while (g_thread) {
+        try {
+            COLORREF logColor = RGB(255, 180, 0);
+            std::wostringstream ss;;
+            ss << ScanSystemMemoryAccess().c_str();
+            std::wstring logStr = ss.str();
+            wchar_t* pText = new wchar_t[logStr.size() + 1];
+            wcscpy_s(pText, logStr.size() + 1, logStr.c_str());
+
+            PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
+        }
+        catch (const std::string&) {}
+
         HANDLE hPipe = CreateNamedPipeW(
             GUARDIAN_PIPE_NAME,
             PIPE_ACCESS_INBOUND,
@@ -382,7 +394,6 @@ static void PipeServerThread() {
                 COLORREF logColor = RGB(200, 200, 200);
                 std::string debugger = RunDebuggerForensics(alert.targetPid);
                 std::string handles = CheckOpenHandles(alert.targetPid);
-                std::string scansystem_memory = ScanSystemMemoryAccess();
 
                 if (alert.type == AlertType::MemoryRead) {
                     logColor = RGB(255, 80, 80);
@@ -393,8 +404,7 @@ static void PipeServerThread() {
                        << L"  „¥„Ÿ Size       : " << alert.bufferSize << L" Bytes\n"
                        << L"  „¥„Ÿ Hex        : " << std::hex << ToHexString(alert.buf, sizeof(alert.buf) < alert.bufferSize ? sizeof(alert.buf): alert.bufferSize).c_str() << std::dec << L"\n"
                        << L"  „¥„Ÿ Debugger   : " << debugger.c_str() << L"\n"
-                       << L"  „¥„Ÿ Handles    : " << handles.c_str() << L"\n"
-                       << L"  „¤„Ÿ ScanMem    : " << scansystem_memory.c_str() << L"\n\n";
+                       << L"  „¤„Ÿ Handles    : " << handles.c_str() << L"\n\n";
                 }
                 else if (alert.type == AlertType::ProcessOpen) {
                     logColor = RGB(255, 180, 0);
@@ -403,8 +413,7 @@ static void PipeServerThread() {
                        << L"  „¥„Ÿ Target PID : " << alert.targetPid << " (" << GetProcessNameFromPID(alert.targetPid).c_str() << L") \n"
                        << L"  „¥„Ÿ Access     : 0x" << std::hex << alert.desiredAccess << std::dec << L"\n"
                        << L"  „¥„Ÿ Debugger   : " << debugger.c_str() << L"\n"
-                       << L"  „¥„Ÿ Handles    : " << handles.c_str() << L"\n"
-                       << L"  „¤„Ÿ ScanMem    : " << scansystem_memory.c_str() << L"\n\n";
+                       << L"  „¤„Ÿ Handles    : " << handles.c_str() << L"\n\n";
                 }
                 else if (alert.type == AlertType::CommonMapView) {
                     logColor = RGB(255, 180, 0);
@@ -414,8 +423,7 @@ static void PipeServerThread() {
                        << L"  „¥„Ÿ View Size   : " << std::dec << alert.bufferSize << " Bytes\n"
                        << L"  „¥„Ÿ Data Peek   : " << std::hex << ToHexString(alert.buf, sizeof(alert.buf) < alert.bufferSize ? sizeof(alert.buf) : alert.bufferSize).c_str() << std::dec << L"\n"
                        << L"  „¥„Ÿ Debugger    : " << debugger.c_str() << L"\n"
-                       << L"  „¥„Ÿ Handles     : " << handles.c_str() << L"\n"
-                       << L"  „¤„Ÿ ScanMem     : " << scansystem_memory.c_str() << L"\n\n";
+                       << L"  „¤„Ÿ Handles     : " << handles.c_str() << L"\n\n";
                 }
                 else if (alert.type == AlertType::DuplicateObject) {
                     logColor = RGB(255, 180, 0);
@@ -424,8 +432,7 @@ static void PipeServerThread() {
                        << L"  „¥„Ÿ DesiredAccess : 0x" << std::hex << alert.desiredAccess << "\n"
                        << L"  „¥„Ÿ Stolen Handle : 0x" << alert.targetPid << " (" << GetProcessNameFromPID(alert.targetPid).c_str() << L") \n"
                        << L"  „¥„Ÿ Debugger      : " << debugger.c_str() << L"\n"
-                       << L"  „¥„Ÿ Handles       : " << handles.c_str() << L"\n"
-                       << L"  „¤„Ÿ ScanMem       : " << scansystem_memory.c_str() << L"\n\n";
+                       << L"  „¤„Ÿ Handles       : " << handles.c_str() << L"\n\n";
                 } else
                     return;
 
@@ -679,7 +686,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.7",
+        L"AI Agent Memory Checker v1.8",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 695, 520,
         nullptr, nullptr, hInstance, nullptr
