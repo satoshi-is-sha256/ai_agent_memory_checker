@@ -12,6 +12,7 @@
 #include "memorydetector.h"
 #include "allsystemhandlesex.h"
 #include "tcp.h"
+#include "commemory.h"
 
 HWND g_hWnd = nullptr;
 HWND g_hEditProcessName = nullptr;
@@ -382,6 +383,27 @@ static void PipeServerThread() {
         }
         catch (const std::string&) {}
 
+        try {
+            COLORREF logColor = RGB(255, 180, 0);
+            wchar_t procNameBuf[256] = { 0 };
+            GetWindowTextW(g_hEditProcessName, procNameBuf, 256);
+
+            if (wcslen(procNameBuf) > 0) {
+                std::vector<DWORD> pids = GetPidsByProcessName(procNameBuf);
+                std::wostringstream ss;
+                ss << L"InspectSectionObjects Common Memory ---\n";
+                for (auto targetPid : pids) {
+                    ss << InspectSectionObjects(targetPid, WStringToString(std::wstring(procNameBuf))).c_str();
+                }
+                std::wstring logStr = ss.str();
+                wchar_t* pText = new wchar_t[logStr.size() + 1];
+                wcscpy_s(pText, logStr.size() + 1, logStr.c_str());
+
+                PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
+            }
+        }
+        catch (const std::string&) {}
+
         HANDLE hPipe = CreateNamedPipeW(
             GUARDIAN_PIPE_NAME,
             PIPE_ACCESS_INBOUND,
@@ -708,7 +730,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.9",
+        L"AI Agent Memory Checker v1.10",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 695, 520,
         nullptr, nullptr, hInstance, nullptr
