@@ -11,6 +11,7 @@
 #include "checkopenhandles.h"
 #include "memorydetector.h"
 #include "allsystemhandlesex.h"
+#include "tcp.h"
 
 HWND g_hWnd = nullptr;
 HWND g_hEditProcessName = nullptr;
@@ -350,13 +351,34 @@ static void PipeServerThread() {
     while (g_thread) {
         try {
             COLORREF logColor = RGB(255, 180, 0);
-            std::wostringstream ss;;
+            std::wostringstream ss;
             ss << ScanSystemMemoryAccess().c_str();
             std::wstring logStr = ss.str();
             wchar_t* pText = new wchar_t[logStr.size() + 1];
             wcscpy_s(pText, logStr.size() + 1, logStr.c_str());
 
             PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
+        }
+        catch (const std::string&) {}
+
+        try {
+            COLORREF logColor = RGB(255, 180, 0);
+            wchar_t procNameBuf[256] = { 0 };
+            GetWindowTextW(g_hEditProcessName, procNameBuf, 256);
+
+            if (wcslen(procNameBuf) > 0) {
+                std::vector<DWORD> pids = GetPidsByProcessName(procNameBuf);
+                std::wostringstream ss;
+                ss << L"InspectTargetNetwork ---\n";
+                for (auto targetPid: pids) {
+                    ss << InspectTargetNetwork(targetPid, WStringToString(std::wstring(procNameBuf))).c_str();
+                }
+                std::wstring logStr = ss.str();
+                wchar_t* pText = new wchar_t[logStr.size() + 1];
+                wcscpy_s(pText, logStr.size() + 1, logStr.c_str());
+
+                PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
+            }
         }
         catch (const std::string&) {}
 
@@ -686,7 +708,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.8",
+        L"AI Agent Memory Checker v1.9",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 695, 520,
         nullptr, nullptr, hInstance, nullptr
