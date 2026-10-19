@@ -13,6 +13,7 @@
 #include "allsystemhandlesex.h"
 #include "tcp.h"
 #include "commemory.h"
+#include "scanincoming.h"
 
 HWND g_hWnd = nullptr;
 HWND g_hEditProcessName = nullptr;
