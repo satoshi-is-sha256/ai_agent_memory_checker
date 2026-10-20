@@ -14,6 +14,7 @@
 #include "tcp.h"
 #include "commemory.h"
 #include "scanincoming.h"
+#include "alpc.h"
 
 HWND g_hWnd = nullptr;
 HWND g_hEditProcessName = nullptr;
@@ -351,6 +352,7 @@ static std::string ScanSystemMemoryAccess() {
 
 static void PipeServerThread() {
     while (g_thread) {
+        /**
         try {
             COLORREF logColor = RGB(255, 180, 0);
             std::string logStr = ScanSystemMemoryAccess();
@@ -414,6 +416,29 @@ static void PipeServerThread() {
                 ss << "ScanIncomingProcessAccess Common Memory ---\n";
                 for (auto targetPid : pids) {
                     ss << ScanIncomingProcessAccess(targetPid, WStringToString(std::wstring(procNameBuf)));
+                }
+                std::string logStr = ss.str();
+                char* pText = new char[logStr.size() + 1];
+                strcpy_s(pText, logStr.size() + 1, logStr.c_str());
+
+                PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY_A, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
+            }
+        }
+        catch (const std::string&) {}
+        **/
+
+        try {
+            COLORREF logColor = RGB(255, 180, 0);
+            wchar_t procNameBuf[256] = { 0 };
+            GetWindowTextW(g_hEditProcessName, procNameBuf, 256);
+
+            if (wcslen(procNameBuf) > 0) {
+                std::ostringstream ss;
+                ss << WStringToString(std::wstring(procNameBuf)) << " ---\n";
+                std::vector<DWORD> pids = GetPidsByProcessName(procNameBuf);
+                ss << "InspectAlpcAndPipes ---\n";
+                for (auto targetPid : pids) {
+                    ss << InspectAlpcAndPipes(targetPid, WStringToString(std::wstring(procNameBuf)));
                 }
                 std::string logStr = ss.str();
                 char* pText = new char[logStr.size() + 1];
@@ -775,7 +800,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.11",
+        L"AI Agent Memory Checker v1.12",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 695, 520,
         nullptr, nullptr, hInstance, nullptr
