@@ -353,13 +353,11 @@ static void PipeServerThread() {
     while (g_thread) {
         try {
             COLORREF logColor = RGB(255, 180, 0);
-            std::wostringstream ss;
-            ss << ScanSystemMemoryAccess().c_str();
-            std::wstring logStr = ss.str();
-            wchar_t* pText = new wchar_t[logStr.size() + 1];
-            wcscpy_s(pText, logStr.size() + 1, logStr.c_str());
+            std::string logStr = ScanSystemMemoryAccess();
+            char* pText = new char[logStr.size() + 1];
+            strcpy_s(pText, logStr.size() + 1, logStr.c_str());
 
-            PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
+            PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY_A, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
         }
         catch (const std::string&) {}
 
@@ -370,16 +368,16 @@ static void PipeServerThread() {
 
             if (wcslen(procNameBuf) > 0) {
                 std::vector<DWORD> pids = GetPidsByProcessName(procNameBuf);
-                std::wostringstream ss;
-                ss << L"InspectTargetNetwork ---\n";
+                std::ostringstream ss;
+                ss << "InspectTargetNetwork ---\n";
                 for (auto targetPid: pids) {
-                    ss << InspectTargetNetwork(targetPid, WStringToString(std::wstring(procNameBuf))).c_str();
+                    ss << InspectTargetNetwork(targetPid, WStringToString(std::wstring(procNameBuf)));
                 }
-                std::wstring logStr = ss.str();
-                wchar_t* pText = new wchar_t[logStr.size() + 1];
-                wcscpy_s(pText, logStr.size() + 1, logStr.c_str());
+                std::string logStr = ss.str();
+                char* pText = new char[logStr.size() + 1];
+                strcpy_s(pText, logStr.size() + 1, logStr.c_str());
 
-                PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
+                PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY_A, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
             }
         }
         catch (const std::string&) {}
@@ -391,16 +389,37 @@ static void PipeServerThread() {
 
             if (wcslen(procNameBuf) > 0) {
                 std::vector<DWORD> pids = GetPidsByProcessName(procNameBuf);
-                std::wostringstream ss;
-                ss << L"InspectSectionObjects Common Memory ---\n";
+                std::ostringstream ss;
+                ss << "InspectSectionObjects Common Memory ---\n";
                 for (auto targetPid : pids) {
-                    ss << InspectSectionObjects(targetPid, WStringToString(std::wstring(procNameBuf))).c_str();
+                    ss << InspectSectionObjects(targetPid, WStringToString(std::wstring(procNameBuf)));
                 }
-                std::wstring logStr = ss.str();
-                wchar_t* pText = new wchar_t[logStr.size() + 1];
-                wcscpy_s(pText, logStr.size() + 1, logStr.c_str());
+                std::string logStr = ss.str();
+                char* pText = new char[logStr.size() + 1];
+                strcpy_s(pText, logStr.size() + 1, logStr.c_str());
 
-                PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
+                PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY_A, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
+            }
+        }
+        catch (const std::string&) {}
+
+        try {
+            COLORREF logColor = RGB(255, 180, 0);
+            wchar_t procNameBuf[256] = { 0 };
+            GetWindowTextW(g_hEditProcessName, procNameBuf, 256);
+
+            if (wcslen(procNameBuf) > 0) {
+                std::vector<DWORD> pids = GetPidsByProcessName(procNameBuf);
+                std::ostringstream ss;
+                ss << "ScanIncomingProcessAccess Common Memory ---\n";
+                for (auto targetPid : pids) {
+                    ss << ScanIncomingProcessAccess(targetPid, WStringToString(std::wstring(procNameBuf)));
+                }
+                std::string logStr = ss.str();
+                char* pText = new char[logStr.size() + 1];
+                strcpy_s(pText, logStr.size() + 1, logStr.c_str());
+
+                PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY_A, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
             }
         }
         catch (const std::string&) {}
@@ -502,6 +521,21 @@ static void AppendLogText(HWND hRichEdit, const std::wstring &text, COLORREF col
     cf.dwMask = CFM_COLOR;
     cf.crTextColor = color;
     const int len = GetWindowTextLengthW(hRichEdit);
+
+    SendMessageW(hRichEdit, EM_SETSEL, (WPARAM)len, (LPARAM)len);
+    SendMessageW(hRichEdit, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&cf);
+    SendMessageW(hRichEdit, EM_REPLACESEL, FALSE, (LPARAM)text.c_str());
+    SendMessageW(hRichEdit, EM_SCROLLCARET, 0, 0);
+}
+
+static void AppendLogTextA(HWND hRichEdit, const std::string &textA, COLORREF color) {
+    CHARFORMAT2W cf = {0};
+    cf.cbSize = sizeof(CHARFORMAT2W);
+    cf.dwMask = CFM_COLOR;
+    cf.crTextColor = color;
+    const int len = GetWindowTextLengthW(hRichEdit);
+
+    std::wstring text = StringToWString(textA);
 
     SendMessageW(hRichEdit, EM_SETSEL, (WPARAM)len, (LPARAM)len);
     SendMessageW(hRichEdit, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&cf);
@@ -703,6 +737,16 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
         break;
     }
 
+    case WM_ADD_LOG_ENTRY_A: {
+        const char *pText = reinterpret_cast<const char *>(wParam);
+        COLORREF color = static_cast<COLORREF>(lParam);
+        if (pText) {
+            AppendLogTextA(hLogEdit, std::string(pText), color);
+            delete [] pText;
+        }
+        break;
+    }
+
     case WM_DESTROY:
         g_thread = false;
         PostQuitMessage(0);
@@ -731,7 +775,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.10",
+        L"AI Agent Memory Checker v1.11",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 695, 520,
         nullptr, nullptr, hInstance, nullptr

@@ -78,9 +78,11 @@ inline std::string InspectSectionObjects(DWORD targetPid, const std::string &pro
                         }
                     }
 
+                    std::string sectionNameA = WStringToString(sectionName);
+
                     ss << "  > [SECTION] Handle: 0x" << std::hex << entry.HandleValue
-                        << " | Rights: 0x" << entry.GrantedAccess
-                        << " | Name: " << std::string(sectionName.begin(), sectionName.end()) << "\n";
+                       << " | Rights: 0x" << entry.GrantedAccess
+                       << " | Name: " << sectionNameA << "\n";
                 }
             }
             CloseHandle(hDuped);

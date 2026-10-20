@@ -23,7 +23,8 @@
 #define IDC_LOG_EDIT           103
 #define IDC_PROCESS_NAME_INPUT 104
 #define IDC_BTN_INJECT_ALL     105
-#define WM_ADD_LOG_ENTRY (WM_USER + 100)
+#define WM_ADD_LOG_ENTRY       (WM_USER + 100)
+#define WM_ADD_LOG_ENTRY_A     (WM_USER + 101)
 
 using pfnNtQuerySystemInformation = NTSTATUS(NTAPI *)(ULONG SystemInformationClass, PVOID SystemInformation, ULONG SystemInformationLength, PULONG ReturnLength);
 using pfnNtQueryObject = NTSTATUS(NTAPI *)(HANDLE Handle, OBJECT_INFORMATION_CLASS ObjectInformationClass, PVOID ObjectInformation, ULONG ObjectInformationLength, PULONG ReturnLength);
@@ -59,6 +60,16 @@ inline std::string WStringToString(const std::wstring &wstr) {
     std::string strTo(sizeNeeded, 0);
     WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), &strTo[0], sizeNeeded, nullptr, nullptr);
     return strTo;
+}
+
+inline std::wstring StringToWString(const std::string &str) {
+    if (str.empty()) return std::wstring();
+    int sizeNeeded = MultiByteToWideChar(CP_UTF8, 0, str.data(), (int)str.size(), nullptr, 0);
+    if (sizeNeeded <= 0) return std::wstring();
+
+    std::wstring wstr(sizeNeeded, 0);
+    MultiByteToWideChar(CP_UTF8, 0, str.data(), (int)str.size(), &wstr[0], sizeNeeded);
+    return wstr;
 }
 
 inline std::string ToHexString(const unsigned char *buf, size_t size) {
