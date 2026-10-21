@@ -7,9 +7,9 @@
 
 #include "common.h"
 
-inline std::string StartPipeTrafficSniffer(DWORD targetPid) {
+inline std::string StartPipeTrafficSniffer(DWORD targetPid, const std::string &processName) {
     std::stringstream ss;
-    ss << "[*] Initializing Traffic Sniffer for Target PID: " << targetPid << "\n";
+    ss << "[*] Initializing Traffic Sniffer for Target PID: " << targetPid << " (" << processName << ")\n";
 
     if (!DebugActiveProcess(targetPid)) {
         ss << "[-] Failed to attach debugger. Check privileges (Run as Administrator). Error: " 

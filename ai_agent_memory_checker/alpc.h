@@ -6,19 +6,21 @@
 typedef NTSTATUS(NTAPI *PFN_NT_QUERY_OBJECT)(HANDLE Handle, OBJECT_INFORMATION_CLASS ObjectInformationClass, PVOID ObjectInformation, ULONG ObjectInformationLength, PULONG ReturnLength);
 
 inline std::string InspectAlpcAndPipes(DWORD targetPid, const std::string &processName) {
-    std::stringstream ss;
-    ss << "[-] Failed to system handle table for IPC inspection.\n";
-
     HMODULE hNtdll = GetModuleHandleW(L"ntdll.dll");
     auto NtQuerySystemInformation = (NTSTATUS(NTAPI *)(ULONG, PVOID, ULONG, PULONG))GetProcAddress(hNtdll, "NtQuerySystemInformation");
     auto NtQueryObject = (PFN_NT_QUERY_OBJECT)GetProcAddress(hNtdll, "NtQueryObject");
 
-    if (!NtQuerySystemInformation || !NtQueryObject) return ss.str();
+    std::stringstream ss;
+    if (!NtQuerySystemInformation || !NtQueryObject) {
+        ss << "[-] Failed to system handle table for IPC inspection.\n";
+        return ss.str();
+    }
 
     ULONG bufferSize = 1024 * 1024 * 10;
     std::vector<BYTE> buffer(bufferSize);
     NTSTATUS status = NtQuerySystemInformation(0x40, buffer.data(), (ULONG)buffer.size(), &bufferSize);
     if (status != 0) {
+        ss << "[-] Failed to system handle table for IPC inspection.\n";
         return ss.str();
     }
 

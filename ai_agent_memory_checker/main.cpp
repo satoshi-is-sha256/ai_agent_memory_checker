@@ -360,7 +360,7 @@ static void PipeServerThread() {
             char* pText = new char[logStr.size() + 1];
             strcpy_s(pText, logStr.size() + 1, logStr.c_str());
 
-            PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY_A, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
+            PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY_LEFT_A, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
         }
         catch (const std::string&) {}
 
@@ -380,7 +380,7 @@ static void PipeServerThread() {
                 char* pText = new char[logStr.size() + 1];
                 strcpy_s(pText, logStr.size() + 1, logStr.c_str());
 
-                PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY_A, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
+                PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY_LEFT_A, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
             }
         }
         catch (const std::string&) {}
@@ -401,7 +401,7 @@ static void PipeServerThread() {
                 char* pText = new char[logStr.size() + 1];
                 strcpy_s(pText, logStr.size() + 1, logStr.c_str());
 
-                PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY_A, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
+                PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY_LEFT_A, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
             }
         }
         catch (const std::string&) {}
@@ -422,7 +422,7 @@ static void PipeServerThread() {
                 char* pText = new char[logStr.size() + 1];
                 strcpy_s(pText, logStr.size() + 1, logStr.c_str());
 
-                PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY_A, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
+                PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY_LEFT_A, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
             }
         }
         catch (const std::string&) {}
@@ -445,7 +445,29 @@ static void PipeServerThread() {
                 char* pText = new char[logStr.size() + 1];
                 strcpy_s(pText, logStr.size() + 1, logStr.c_str());
 
-                PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY_A, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
+                PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY_LEFT_A, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
+            }
+        }
+        catch (const std::string&) {}
+
+        try {
+            COLORREF logColor = RGB(255, 180, 0);
+            wchar_t procNameBuf[256] = { 0 };
+            GetWindowTextW(g_hEditProcessName, procNameBuf, 256);
+
+            if (wcslen(procNameBuf) > 0) {
+                std::ostringstream ss;
+                ss << WStringToString(std::wstring(procNameBuf)) << " ---\n";
+                std::vector<DWORD> pids = GetPidsByProcessName(procNameBuf);
+                ss << "StartPipeTrafficSniffer ---\n";
+                for (auto targetPid : pids) {
+                    ss << StartPipeTrafficSniffer(targetPid, WStringToString(std::wstring(procNameBuf)));
+                }
+                std::string logStr = ss.str();
+                char* pText = new char[logStr.size() + 1];
+                strcpy_s(pText, logStr.size() + 1, logStr.c_str());
+
+                PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY_RIGHT_A, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
             }
         }
         catch (const std::string&) {}
@@ -531,7 +553,7 @@ static void PipeServerThread() {
                     wchar_t *pText = new wchar_t[logStr.size() + 1];
                     wcscpy_s(pText, logStr.size() + 1, logStr.c_str());
 
-                    PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
+                    PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY_LEFT, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
                 } catch (const std::string &) {}
             }
         }
@@ -611,9 +633,10 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
     static HWND hEditPid = nullptr;
     static HWND hBtnInject = nullptr;
     static HWND hBtnInjectAll = nullptr;
-    static HWND hLogEdit = nullptr;
+    static HWND hLogEditLeft = nullptr;
+    static HWND hLogEditRight = nullptr;
     auto InstanceCheck = []() {
-        return hStatic && g_hEditProcessName && hEditPid && hBtnInject && hBtnInjectAll && hLogEdit;
+        return hStatic && g_hEditProcessName && hEditPid && hBtnInject && hBtnInjectAll && hLogEditLeft && hLogEditRight;
     };
     auto DisableButton = []() {
         EnableWindow(hBtnInject, FALSE);
@@ -657,10 +680,17 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
             hWnd, (HMENU)IDC_BTN_INJECT_ALL, nullptr, nullptr
         );
 
-        hLogEdit = CreateWindowExW(
+        hLogEditLeft = CreateWindowExW(
             WS_EX_CLIENTEDGE, MSFTEDIT_CLASS, L"",
             WS_VISIBLE | WS_CHILD | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY,
             15, 50, 650, 420,
+            hWnd, (HMENU)IDC_LOG_EDIT, nullptr, nullptr
+        );
+
+        hLogEditRight = CreateWindowExW(
+            WS_EX_CLIENTEDGE, MSFTEDIT_CLASS, L"",
+            WS_VISIBLE | WS_CHILD | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY,
+            670, 50, 650, 420,
             hWnd, (HMENU)IDC_LOG_EDIT, nullptr, nullptr
         );
 
@@ -669,7 +699,8 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
             return 0;
         }
 
-        SendMessageW(hLogEdit, EM_SETBKGNDCOLOR, 0, (LPARAM)RGB(25, 25, 25));
+        SendMessageW(hLogEditLeft, EM_SETBKGNDCOLOR, 0, (LPARAM)RGB(25, 25, 25));
+        SendMessageW(hLogEditRight, EM_SETBKGNDCOLOR, 0, (LPARAM)RGB(25, 25, 25));
 
         CHARFORMAT2W cf = {0};
         cf.cbSize = sizeof(CHARFORMAT2W);
@@ -677,14 +708,15 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
         cf.yHeight = 180;
         wcscpy_s(cf.szFaceName, L"Consolas");
         cf.crTextColor = RGB(200, 200, 200);
-        SendMessageW(hLogEdit, EM_SETCHARFORMAT, SCF_ALL, (LPARAM)&cf);
+        SendMessageW(hLogEditLeft, EM_SETCHARFORMAT, SCF_ALL, (LPARAM)&cf);
+        SendMessageW(hLogEditRight, EM_SETCHARFORMAT, SCF_ALL, (LPARAM)&cf);
 
-        AppendLogText(hLogEdit, L"[AI Agent Memory Checker] Initialization completed.\n", RGB(100, 200, 250));
-        AppendLogText(hLogEdit, L"[System] Ready for Windows 11 (x64) process monitoring.\n\n", RGB(150, 150, 150));
+        AppendLogText(hLogEditLeft, L"[AI Agent Memory Checker] Initialization completed.\n", RGB(100, 200, 250));
+        AppendLogText(hLogEditLeft, L"[System] Ready for Windows 11 (x64) process monitoring.\n\n", RGB(150, 150, 150));
 
         g_thread = true;
         std::thread(PipeServerThread).detach();
-        AppendLogText(hLogEdit, L"[AI Agent Memory Checker] IPC Pipe listener initialized.\n\n", RGB(100, 200, 250));
+        AppendLogText(hLogEditLeft, L"[AI Agent Memory Checker] IPC Pipe listener initialized.\n\n", RGB(100, 200, 250));
         break;
     }
 
@@ -701,7 +733,7 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
 
             std::wostringstream ss;
             ss << L"[+] Initiating monitoring on PID: " << pid << L"...\n";
-            AppendLogText(hLogEdit, ss.str(), RGB(100, 255, 100));
+            AppendLogText(hLogEditLeft, ss.str(), RGB(100, 255, 100));
             DisableButton();
         } 
         else if (LOWORD(wParam) == IDC_BTN_INJECT_ALL) {
@@ -718,7 +750,7 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
             if (pids.empty()) {
                 std::wostringstream ss;
                 ss << L"[-] No running instances found for: " << procNameBuf << L"\n";
-                AppendLogText(hLogEdit, ss.str(), RGB(255, 150, 0));
+                AppendLogText(hLogEditLeft, ss.str(), RGB(255, 150, 0));
                 break;
             }
 
@@ -728,47 +760,67 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
 
             std::wostringstream ssHeader;
             ssHeader << L"[+] Found " << pids.size() << L" process instance(s) for " << procNameBuf << L". Attaching...\n";
-            AppendLogText(hLogEdit, ssHeader.str(), RGB(100, 200, 250));
+            AppendLogText(hLogEditLeft, ssHeader.str(), RGB(100, 200, 250));
 
             size_t successCount = 0;
             for (DWORD pid : pids) {
                 if (InjectGuardianCore(pid, dllPath.c_str())) {
                     std::wostringstream ss;
                     ss << L"  „¥„Ÿ [OK] Attached to PID: " << pid << L"\n";
-                    AppendLogText(hLogEdit, ss.str(), RGB(100, 255, 100));
+                    AppendLogText(hLogEditLeft, ss.str(), RGB(100, 255, 100));
                     successCount++;
                 }
                 else {
                     std::wostringstream ss;
                     ss << L"  „¥„Ÿ [FAIL] Could not attach to PID: " << pid << L" (Check admin privileges)\n";
-                    AppendLogText(hLogEdit, ss.str(), RGB(255, 100, 100));
+                    AppendLogText(hLogEditLeft, ss.str(), RGB(255, 100, 100));
                 }
             }
 
             std::wostringstream ssFooter;
             ssFooter << L"[+] Monitoring activated on " << successCount << L"/" << pids.size() << L" process(es).\n\n";
-            AppendLogText(hLogEdit, ssFooter.str(), RGB(100, 255, 100));
+            AppendLogText(hLogEditLeft, ssFooter.str(), RGB(100, 255, 100));
             DisableButton();
         }
         break;
     }
 
-    case WM_ADD_LOG_ENTRY: {
+    case WM_ADD_LOG_ENTRY_LEFT: {
         const wchar_t *pText = reinterpret_cast<wchar_t *>(wParam);
         COLORREF color = static_cast<COLORREF>(lParam);
         if (pText) {
-            AppendLogText(hLogEdit, std::wstring(pText), color);
+            AppendLogText(hLogEditLeft, std::wstring(pText), color);
             delete [] pText;
         }
         break;
     }
 
-    case WM_ADD_LOG_ENTRY_A: {
+    case WM_ADD_LOG_ENTRY_LEFT_A: {
         const char *pText = reinterpret_cast<const char *>(wParam);
         COLORREF color = static_cast<COLORREF>(lParam);
         if (pText) {
-            AppendLogTextA(hLogEdit, std::string(pText), color);
+            AppendLogTextA(hLogEditLeft, std::string(pText), color);
             delete [] pText;
+        }
+        break;
+    }
+
+    case WM_ADD_LOG_ENTRY_RIGHT: {
+        const wchar_t* pText = reinterpret_cast<wchar_t*>(wParam);
+        COLORREF color = static_cast<COLORREF>(lParam);
+        if (pText) {
+            AppendLogText(hLogEditRight, std::wstring(pText), color);
+            delete[] pText;
+        }
+        break;
+    }
+
+    case WM_ADD_LOG_ENTRY_RIGHT_A: {
+        const char* pText = reinterpret_cast<const char*>(wParam);
+        COLORREF color = static_cast<COLORREF>(lParam);
+        if (pText) {
+            AppendLogTextA(hLogEditRight, std::string(pText), color);
+            delete[] pText;
         }
         break;
     }
@@ -801,9 +853,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.12",
+        L"AI Agent Memory Checker v1.13",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
-        CW_USEDEFAULT, CW_USEDEFAULT, 695, 520,
+        CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
     );
 

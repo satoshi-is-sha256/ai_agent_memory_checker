@@ -18,13 +18,15 @@
 #include <sstream>
 #pragma comment(lib, "comctl32.lib")
 
-#define IDC_PID_INPUT          101
-#define IDC_BTN_INJECT         102
-#define IDC_LOG_EDIT           103
-#define IDC_PROCESS_NAME_INPUT 104
-#define IDC_BTN_INJECT_ALL     105
-#define WM_ADD_LOG_ENTRY       (WM_USER + 100)
-#define WM_ADD_LOG_ENTRY_A     (WM_USER + 101)
+#define IDC_PID_INPUT             101
+#define IDC_BTN_INJECT            102
+#define IDC_LOG_EDIT              103
+#define IDC_PROCESS_NAME_INPUT    104
+#define IDC_BTN_INJECT_ALL        105
+#define WM_ADD_LOG_ENTRY_LEFT     (WM_USER + 100)
+#define WM_ADD_LOG_ENTRY_LEFT_A   (WM_USER + 101)
+#define WM_ADD_LOG_ENTRY_RIGHT    (WM_USER + 102)
+#define WM_ADD_LOG_ENTRY_RIGHT_A  (WM_USER + 103)
 
 using pfnNtQuerySystemInformation = NTSTATUS(NTAPI *)(ULONG SystemInformationClass, PVOID SystemInformation, ULONG SystemInformationLength, PULONG ReturnLength);
 using pfnNtQueryObject = NTSTATUS(NTAPI *)(HANDLE Handle, OBJECT_INFORMATION_CLASS ObjectInformationClass, PVOID ObjectInformation, ULONG ObjectInformationLength, PULONG ReturnLength);
