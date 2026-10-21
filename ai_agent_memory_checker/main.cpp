@@ -15,6 +15,7 @@
 #include "commemory.h"
 #include "scanincoming.h"
 #include "alpc.h"
+#include "realtimechecking.h"
 
 HWND g_hWnd = nullptr;
 HWND g_hEditProcessName = nullptr;

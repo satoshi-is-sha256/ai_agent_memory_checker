@@ -80,7 +80,7 @@ inline std::string InspectAlpcAndPipes(DWORD targetPid, const std::string &proce
 
                         ss << "  > " << category << " Handle: 0x" << std::hex << entry.HandleValue
                            << " | Rights: 0x" << entry.GrantedAccess
-                           << " | Name: " << std::string(objName.begin(), objName.end()) << "\n";
+                           << " | Name: " << WStringToString(objName) << "\n";
                     }
                 }
             }
