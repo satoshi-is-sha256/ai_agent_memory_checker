@@ -6,8 +6,14 @@
 #define REALTIMECHECKING_H
 
 #include "common.h"
+#include <fstream>
 
 inline std::string StartPipeTrafficSniffer(DWORD targetPid, const std::string &processName) {
+    std::ofstream logFile("pipe_dump.log", std::ios::app);
+    if (logFile.is_open()) {
+        logFile << "=== New Session Started for PID: " << targetPid << " processName: " << processName << " ===\n";
+    }
+
     std::stringstream ss;
     ss << "[*] Initializing Traffic Sniffer for Target PID: " << targetPid << " (" << processName << ")\n";
 
@@ -57,6 +63,24 @@ inline std::string StartPipeTrafficSniffer(DWORD targetPid, const std::string &p
                                     ss << "[>>>] Pipe I/O Captured! Handle: 0x" << std::hex << hFile 
                                        << " | Size: " << std::dec << bytesRead << " bytes\n";
                                     ss << "      Payload: " << payload << "\n\n";
+
+                                    bool isInteresting = (payload.find("token") != std::string::npos ||
+                                        payload.find("auth") != std::string::npos ||
+                                        payload.find("json") != std::string::npos);
+
+                                    ss << "[>>>] Pipe I/O Captured! Handle: 0x" << std::hex << hFile
+                                       << " | Size: " << std::dec << bytesRead << " bytes\n";
+
+                                    if (isInteresting) {
+                                        ss << "      [!] KEYWORD MATCHED IN PAYLOAD:\n";
+                                    }
+                                    ss << "      Payload: " << payload << "\n\n";
+
+                                    if (logFile.is_open()) {
+                                        logFile << "[Handle: 0x" << std::hex << hFile << " | Size: " << std::dec << bytesRead << " bytes]\n";
+                                        logFile << payload << "\n----------------------------------------\n";
+                                        logFile.flush();
+                                    }
                                 }
                                 CloseHandle(hTargetProc);
                             }
@@ -86,6 +110,7 @@ inline std::string StartPipeTrafficSniffer(DWORD targetPid, const std::string &p
     }
 
     DebugActiveProcessStop(targetPid);
+    DebugSetProcessKillOnExit(FALSE);
     ss << "[*] Sniffer detached safely.\n";
     return ss.str();
 }
