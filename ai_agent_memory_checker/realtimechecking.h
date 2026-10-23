@@ -8,6 +8,19 @@
 #include "common.h"
 #include <fstream>
 
+constexpr DWORD EXCEPTION_INTENTIONAL_BREAKPOINT = 0x80000003;
+
+inline LPVOID GetRemoteNtAlpcAddress(HANDLE hProcess) {
+    (void)hProcess;
+
+    HMODULE hLocalNtdll = GetModuleHandleA("ntdll.dll");
+    FARPROC pLocalFunc = GetProcAddress(hLocalNtdll, "NtAlpcSendWaitReceivePort");
+    
+    if (!pLocalFunc) return nullptr;
+
+    return reinterpret_cast<LPVOID>(pLocalFunc);
+}
+
 inline std::string StartPipeTrafficSniffer(DWORD targetPid, const std::string &processName) {
     std::ofstream logFile("pipe_dump.log", std::ios::app);
     if (logFile.is_open()) {
@@ -39,6 +52,72 @@ inline std::string StartPipeTrafficSniffer(DWORD targetPid, const std::string &p
             ss << "[*] Target process module loaded. Sniffer active.\n";
             break;
 
+        case EXCEPTION_DEBUG_EVENT:
+        {
+            auto &ex = de.u.Exception.ExceptionRecord;
+            LPVOID hitAddress = ex.ExceptionAddress;
+
+            static LPVOID targetNtAlpcFunc = nullptr;
+            if (!targetNtAlpcFunc) {
+                HANDLE hTargetProc = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, de.dwProcessId);
+                if (hTargetProc) {
+                    targetNtAlpcFunc = GetRemoteNtAlpcAddress(hTargetProc);
+                    CloseHandle(hTargetProc);
+                }
+            }
+
+            if (targetNtAlpcFunc && hitAddress == targetNtAlpcFunc) {
+                HANDLE hThread = OpenThread(THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION, FALSE, de.dwThreadId);
+                if (hThread) {
+                    CONTEXT ctx = { 0 };
+                    ctx.ContextFlags = CONTEXT_CONTROL | CONTEXT_INTEGER;
+            
+                    if (GetThreadContext(hThread, &ctx)) {
+                        HANDLE hPort = reinterpret_cast<HANDLE>(ctx.Rcx);
+                        LPVOID pSendMessage = reinterpret_cast<LPVOID>(ctx.R8);
+
+                        if (pSendMessage != nullptr) {
+                            struct PORT_MESSAGE_HEADER {
+                                USHORT DataSize;
+                                USHORT MessageSize;
+                                USHORT MessageType;
+                                USHORT VirtualRangesOffset;
+                            } msgHeader = { 0 };
+
+                            HANDLE hTargetProc = OpenProcess(PROCESS_VM_READ, FALSE, de.dwProcessId);
+                            if (hTargetProc) {
+                                SIZE_T bytesRead = 0;
+                                if (ReadProcessMemory(hTargetProc, pSendMessage, &msgHeader, sizeof(msgHeader), &bytesRead)) {
+                                    LPVOID pDataPayload = reinterpret_cast<LPBYTE>(pSendMessage) + sizeof(PORT_MESSAGE_HEADER) + 8;
+                                    USHORT payloadSize = msgHeader.DataSize;
+
+                                    if (payloadSize > 0 && payloadSize < 4096) {
+                                        std::vector<BYTE> alpcData(payloadSize);
+                                        if (ReadProcessMemory(hTargetProc, pDataPayload, alpcData.data(), payloadSize, &bytesRead)) {
+                                            std::string alpcPayload(reinterpret_cast<char*>(alpcData.data()), bytesRead);
+                                    
+                                            ss << "[ALPC-SNIFF] Unnamed/Named ALPC Traffic Captured!\n";
+                                            ss << "             Port Handle: 0xstd::hex" << hPort << "\n";
+                                            ss << "             Data Size: " << std::dec << bytesRead << " bytes\n";
+                                            ss << "             Payload: " << alpcPayload << "\n\n";
+                                        }
+                                    }
+                                }
+                                CloseHandle(hTargetProc);
+                            }
+                        }
+                    }
+                    CloseHandle(hThread);
+                }
+                continueStatus = DBG_CONTINUE;
+            }
+            else {
+                continueStatus = EXCEPTION_INTENTIONAL_BREAKPOINT == ex.ExceptionCode ? DBG_CONTINUE : DBG_EXCEPTION_NOT_HANDLED;
+            }
+            break;
+        }
+
+        /**
         case EXCEPTION_DEBUG_EVENT:
         {
             auto& ex = de.u.Exception.ExceptionRecord;
@@ -96,6 +175,7 @@ inline std::string StartPipeTrafficSniffer(DWORD targetPid, const std::string &p
             }
             break;
         }
+        **/
 
         case EXIT_PROCESS_DEBUG_EVENT:
             ss << "[*] Target process exited.\n";

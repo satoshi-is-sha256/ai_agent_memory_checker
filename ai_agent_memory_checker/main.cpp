@@ -267,7 +267,7 @@ static std::string ScanSystemMemoryAccess() {
 
                 const bool canRead = (grantedAccess & PROCESS_VM_READ) != 0;
                 const bool canWrite = (grantedAccess & PROCESS_VM_WRITE) != 0;
-                const bool canOperate = (grantedAccess & PROCESS_VM_OPERATION) != 0;
+                //const bool canOperate = (grantedAccess & PROCESS_VM_OPERATION) != 0;
                 const bool canCreateThread = (grantedAccess & PROCESS_CREATE_THREAD) != 0;
                 const bool isFullAccess = (grantedAccess & 0x1F0FFF) == 0x1F0FFF;
 
@@ -863,10 +863,13 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
 }
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow) {
+    (void)lpCmdLine;
+    (void)hPrevInstance;
+
     LoadLibraryW(L"Msftedit.dll");
     InitCommonControls();
 
-    WNDCLASSEXW wc = { sizeof(WNDCLASSEXW) };
+    WNDCLASSEXW wc = { 0 };
     wc.cbSize = sizeof(WNDCLASSEXW);
     wc.lpfnWndProc = WndProc;
     wc.hInstance = hInstance;
@@ -879,7 +882,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.14",
+        L"AI Agent Memory Checker v1.15",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
