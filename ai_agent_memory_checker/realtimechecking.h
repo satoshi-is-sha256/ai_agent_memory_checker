@@ -75,7 +75,64 @@ inline std::string StartPipeTrafficSniffer(DWORD targetPid, const std::string &p
                     if (GetThreadContext(hThread, &ctx)) {
                         HANDLE hPort = reinterpret_cast<HANDLE>(ctx.Rcx);
                         LPVOID pSendMessage = reinterpret_cast<LPVOID>(ctx.R8);
+                        LPVOID pReceiveMessage = reinterpret_cast<LPVOID>(ctx.R9);
+                        HANDLE hTargetProc = OpenProcess(PROCESS_VM_READ, FALSE, de.dwProcessId);
+                        if (hTargetProc) {
+                            struct PORT_MESSAGE_HEADER {
+                                USHORT DataSize;
+                                USHORT MessageSize;
+                                USHORT MessageType;
+                                USHORT VirtualRangesOffset;
+                            };
 
+                            if (pSendMessage != nullptr) {
+                                PORT_MESSAGE_HEADER sendHeader = { 0 };
+                                SIZE_T bytesRead = 0;
+
+                                if (ReadProcessMemory(hTargetProc, pSendMessage, &sendHeader, sizeof(sendHeader), &bytesRead)) {
+                                    LPVOID pDataPayload = reinterpret_cast<LPBYTE>(pSendMessage) + sizeof(PORT_MESSAGE_HEADER) + 8; // ClientId等のオフセット調整
+                                    USHORT payloadSize = sendHeader.DataSize;
+
+                                    if (payloadSize > 0 && payloadSize < 8192) {
+                                        std::vector<BYTE> alpcData(payloadSize);
+                                        if (ReadProcessMemory(hTargetProc, pDataPayload, alpcData.data(), payloadSize, &bytesRead)) {
+                                            std::string payload(reinterpret_cast<char*>(alpcData.data()), bytesRead);
+
+                                            ss << "[ALPC-SEND] Port: 0x" << std::hex << hPort
+                                               << " | Size: " << std::dec << bytesRead << " bytes\n";
+                                            ss << "            Payload: " << payload << "\n\n";
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (pReceiveMessage != nullptr) {
+                                PORT_MESSAGE_HEADER recvHeader = { 0 };
+                                SIZE_T bytesRead = 0;
+
+                                if (ReadProcessMemory(hTargetProc, pReceiveMessage, &recvHeader, sizeof(recvHeader), &bytesRead)) {
+                                    LPVOID pDataPayload = reinterpret_cast<LPBYTE>(pReceiveMessage) + sizeof(PORT_MESSAGE_HEADER) + 8;
+                                    USHORT payloadSize = recvHeader.DataSize;
+
+                                    if (payloadSize > 0 && payloadSize < 8192) {
+                                        std::vector<BYTE> alpcData(payloadSize);
+                                        if (ReadProcessMemory(hTargetProc, pDataPayload, alpcData.data(), payloadSize, &bytesRead)) {
+                                            std::string payload(reinterpret_cast<char*>(alpcData.data()), bytesRead);
+
+                                            ss << "[ALPC-RECV] Port: 0x" << std::hex << hPort
+                                               << " | Size: " << std::dec << bytesRead << " bytes\n";
+                                            ss << "            Payload: " << payload << "\n\n";
+                                        }
+                                    }
+                                }
+                            }
+                            CloseHandle(hTargetProc);
+                        }
+
+                        /////////////////////////////////////////////////////////////////////////////////////////
+
+                        hPort = reinterpret_cast<HANDLE>(ctx.Rcx);
+                        pSendMessage = reinterpret_cast<LPVOID>(ctx.R8);
                         if (pSendMessage != nullptr) {
                             struct PORT_MESSAGE_HEADER {
                                 USHORT DataSize;
@@ -84,63 +141,45 @@ inline std::string StartPipeTrafficSniffer(DWORD targetPid, const std::string &p
                                 USHORT VirtualRangesOffset;
                             } msgHeader = { 0 };
 
-                            HANDLE hTargetProc = OpenProcess(PROCESS_VM_READ, FALSE, de.dwProcessId);
-                            if (hTargetProc) {
-                                SIZE_T bytesRead = 0;
-                                if (ReadProcessMemory(hTargetProc, pSendMessage, &msgHeader, sizeof(msgHeader), &bytesRead)) {
-                                    LPVOID pDataPayload = reinterpret_cast<LPBYTE>(pSendMessage) + sizeof(PORT_MESSAGE_HEADER) + 8;
-                                    USHORT payloadSize = msgHeader.DataSize;
+                            {
+                                HANDLE hTargetProc2 = OpenProcess(PROCESS_VM_READ, FALSE, de.dwProcessId);
+                                if (hTargetProc2) {
+                                    SIZE_T bytesRead = 0;
+                                    if (ReadProcessMemory(hTargetProc2, pSendMessage, &msgHeader, sizeof(msgHeader), &bytesRead)) {
+                                        LPVOID pDataPayload = reinterpret_cast<LPBYTE>(pSendMessage) + sizeof(PORT_MESSAGE_HEADER) + 8;
+                                        USHORT payloadSize = msgHeader.DataSize;
 
-                                    if (payloadSize > 0 && payloadSize < 4096) {
-                                        std::vector<BYTE> alpcData(payloadSize);
-                                        if (ReadProcessMemory(hTargetProc, pDataPayload, alpcData.data(), payloadSize, &bytesRead)) {
-                                            std::string alpcPayload(reinterpret_cast<char*>(alpcData.data()), bytesRead);
+                                        if (payloadSize > 0 && payloadSize < 4096) {
+                                            std::vector<BYTE> alpcData(payloadSize);
+                                            if (ReadProcessMemory(hTargetProc2, pDataPayload, alpcData.data(), payloadSize, &bytesRead)) {
+                                                std::string alpcPayload(reinterpret_cast<char*>(alpcData.data()), bytesRead);
                                     
-                                            ss << "[ALPC-SNIFF] Unnamed/Named ALPC Traffic Captured!\n";
-                                            ss << "             Port Handle: 0xstd::hex" << hPort << "\n";
-                                            ss << "             Data Size: " << std::dec << bytesRead << " bytes\n";
-                                            ss << "             Payload: " << alpcPayload << "\n\n";
+                                                ss << "[ALPC-SNIFF] Unnamed/Named ALPC Traffic Captured!\n";
+                                                ss << "             Port Handle: 0xstd::hex" << hPort << "\n";
+                                                ss << "             Data Size: " << std::dec << bytesRead << " bytes\n";
+                                                ss << "             Payload: " << alpcPayload << "\n\n";
+                                            }
                                         }
                                     }
+                                    CloseHandle(hTargetProc2);
                                 }
-                                CloseHandle(hTargetProc);
                             }
                         }
-                    }
-                    CloseHandle(hThread);
-                }
-                continueStatus = DBG_CONTINUE;
-            }
-            else {
-                continueStatus = EXCEPTION_INTENTIONAL_BREAKPOINT == ex.ExceptionCode ? DBG_CONTINUE : DBG_EXCEPTION_NOT_HANDLED;
-            }
-            break;
-        }
 
-        /**
-        case EXCEPTION_DEBUG_EVENT:
-        {
-            auto& ex = de.u.Exception.ExceptionRecord;
-            if (ex.ExceptionCode == EXCEPTION_BREAKPOINT) {
-                //LPVOID hitAddress = ex.ExceptionAddress;
-                HANDLE hThread = OpenThread(THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION, FALSE, de.dwThreadId);
-                if (hThread) {
-                    CONTEXT ctx = { 0 };
-                    ctx.ContextFlags = CONTEXT_CONTROL | CONTEXT_INTEGER;
-            
-                    if (GetThreadContext(hThread, &ctx)) {
+                        ///////////////////////////////////////////////////////////////////////////////////////////
+
                         HANDLE hFile = reinterpret_cast<HANDLE>(ctx.Rcx);
                         LPVOID lpBuffer = reinterpret_cast<LPVOID>(ctx.Rdx);
                         DWORD bufferSize = static_cast<DWORD>(ctx.R8);
                         if (bufferSize > 0 && bufferSize < 4096) {
                             std::vector<BYTE> data(bufferSize);
                             SIZE_T bytesRead = 0;
-                            HANDLE hTargetProc = OpenProcess(PROCESS_VM_READ, FALSE, de.dwProcessId);
-                            if (hTargetProc) {
-                                if (ReadProcessMemory(hTargetProc, lpBuffer, data.data(), bufferSize, &bytesRead)) {
+                            HANDLE hTargetProc2 = OpenProcess(PROCESS_VM_READ, FALSE, de.dwProcessId);
+                            if (hTargetProc2) {
+                                if (ReadProcessMemory(hTargetProc2, lpBuffer, data.data(), bufferSize, &bytesRead)) {
                                     std::string payload(reinterpret_cast<char*>(data.data()), bytesRead);
-                                    ss << "[>>>] Pipe I/O Captured! Handle: 0x" << std::hex << hFile 
-                                       << " | Size: " << std::dec << bytesRead << " bytes\n";
+                                    ss << "[>>>] Pipe I/O Captured! Handle: 0x" << std::hex << hFile
+                                        << " | Size: " << std::dec << bytesRead << " bytes\n";
                                     ss << "      Payload: " << payload << "\n\n";
 
                                     bool isInteresting = (payload.find("token") != std::string::npos ||
@@ -148,7 +187,7 @@ inline std::string StartPipeTrafficSniffer(DWORD targetPid, const std::string &p
                                         payload.find("json") != std::string::npos);
 
                                     ss << "[>>>] Pipe I/O Captured! Handle: 0x" << std::hex << hFile
-                                       << " | Size: " << std::dec << bytesRead << " bytes\n";
+                                        << " | Size: " << std::dec << bytesRead << " bytes\n";
 
                                     if (isInteresting) {
                                         ss << "      [!] KEYWORD MATCHED IN PAYLOAD:\n";
@@ -161,21 +200,19 @@ inline std::string StartPipeTrafficSniffer(DWORD targetPid, const std::string &p
                                         logFile.flush();
                                     }
                                 }
-                                CloseHandle(hTargetProc);
+                                CloseHandle(hTargetProc2);
                             }
                         }
                     }
                     CloseHandle(hThread);
                 }
-
                 continueStatus = DBG_CONTINUE;
             }
             else {
-                continueStatus = DBG_EXCEPTION_NOT_HANDLED;
+                continueStatus = EXCEPTION_INTENTIONAL_BREAKPOINT == ex.ExceptionCode ? DBG_CONTINUE : DBG_EXCEPTION_NOT_HANDLED;
             }
             break;
         }
-        **/
 
         case EXIT_PROCESS_DEBUG_EVENT:
             ss << "[*] Target process exited.\n";

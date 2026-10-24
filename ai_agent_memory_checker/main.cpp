@@ -352,6 +352,8 @@ static std::string ScanSystemMemoryAccess() {
 }
 
 static void PipeServerThread() {
+    bool fLogLeft = true;
+    bool fLogRight = true;
     while (g_thread) {
         /**
         try {
@@ -430,12 +432,13 @@ static void PipeServerThread() {
 
         try {
 
-            {
+            if (fLogLeft) {
                 COLORREF logColor = RGB(255, 180, 0);
                 std::string logStr = "Start ...\n\n";
                 char* pText = new char[logStr.size() + 1];
                 strcpy_s(pText, logStr.size() + 1, logStr.c_str());
                 PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY_LEFT_A, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
+                fLogLeft = false;
             }
 
             COLORREF logColor = RGB(255, 180, 0);
@@ -461,12 +464,13 @@ static void PipeServerThread() {
 
         try {
 
-            {
+            if (fLogRight) {
                 COLORREF logColor = RGB(255, 180, 0);
                 std::string logStr = "Start ...\n\n";
                 char* pText = new char[logStr.size() + 1];
                 strcpy_s(pText, logStr.size() + 1, logStr.c_str());
                 PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY_RIGHT_A, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
+                fLogRight = false;
             }
 
             COLORREF logColor = RGB(255, 180, 0);
@@ -882,7 +886,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.15",
+        L"AI Agent Memory Checker v1.16",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
