@@ -16,6 +16,7 @@
 #include "scanincoming.h"
 #include "alpc.h"
 #include "realtimechecking.h"
+#include "treeprocess.h"
 
 HWND g_hWnd = nullptr;
 HWND g_hEditProcessName = nullptr;
@@ -663,10 +664,11 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
     static HWND hEditPid = nullptr;
     static HWND hBtnInject = nullptr;
     static HWND hBtnInjectAll = nullptr;
+    static HWND hBtnAttachMain = nullptr;
     static HWND hLogEditLeft = nullptr;
     static HWND hLogEditRight = nullptr;
     auto InstanceCheck = []() {
-        return hStatic && g_hEditProcessName && hEditPid && hBtnInject && hBtnInjectAll && hLogEditLeft && hLogEditRight;
+        return hStatic && g_hEditProcessName && hEditPid && hBtnInject && hBtnInjectAll && hBtnAttachMain && hLogEditLeft && hLogEditRight;
     };
     auto DisableButton = []() {
         EnableWindow(hBtnInject, FALSE);
@@ -708,6 +710,13 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
             WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
             490, 11, 160, 27,
             hWnd, (HMENU)IDC_BTN_INJECT_ALL, nullptr, nullptr
+        );
+
+        hBtnAttachMain = CreateWindowW(
+            L"BUTTON", L"Attach Main Instances",
+            WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
+            660, 11, 180, 27,
+            hWnd, (HMENU)IDC_BYN_ATTACH_MAIN, nullptr, nullptr
         );
 
         hLogEditLeft = CreateWindowExW(
@@ -811,6 +820,31 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
             ssFooter << L"[+] Monitoring activated on " << successCount << L"/" << pids.size() << L" process(es).\n\n";
             AppendLogText(hLogEditLeft, ssFooter.str(), RGB(100, 255, 100));
             DisableButton();
+        } else if (LOWORD(wParam) == IDC_BYN_ATTACH_MAIN) {
+            char procNameBuf[256] = { 0 };
+            GetWindowTextA(g_hEditProcessName, procNameBuf, 256);
+
+            if (strlen(procNameBuf) == 0) {
+                MessageBoxW(hWnd, L"Please enter a target process name (e.g. ChatGPT.exe).", L"Error", MB_OK | MB_ICONERROR);
+                break;
+            }
+
+            std::ostringstream ss;
+            ss << "GetProcessTree Instance: " << procNameBuf << "\n";
+            auto processTree = GetProcessTree(std::string(procNameBuf));
+            if (processTree.empty()) {
+                ss << "[!] No instances found.\n";
+                AppendLogTextA(hLogEditLeft, ss.str(), RGB(100, 255, 100));
+                break;
+            }
+
+            DWORD mainPid = FindMainChatGPTProcess(processTree);
+            ss << "[+] Main Process identified: PID " << mainPid << "\n";
+
+            CheckOpenHandles(mainPid);
+            StartPipeTrafficSniffer(mainPid, std::string(procNameBuf));
+            AppendLogTextA(hLogEditLeft, ss.str(), RGB(100, 255, 100));
+            DisableButton();
         }
         break;
     }
@@ -886,7 +920,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.16",
+        L"AI Agent Memory Checker v1.17",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr

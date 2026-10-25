@@ -138,6 +138,7 @@
     <ClInclude Include="realtimechecking.h" />
     <ClInclude Include="scanincoming.h" />
     <ClInclude Include="tcp.h" />
+    <ClInclude Include="treeprocess.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

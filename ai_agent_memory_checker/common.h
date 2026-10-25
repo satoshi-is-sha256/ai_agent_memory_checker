@@ -23,6 +23,7 @@
 #define IDC_LOG_EDIT              103
 #define IDC_PROCESS_NAME_INPUT    104
 #define IDC_BTN_INJECT_ALL        105
+#define IDC_BYN_ATTACH_MAIN       106
 #define WM_ADD_LOG_ENTRY_LEFT     (WM_USER + 100)
 #define WM_ADD_LOG_ENTRY_LEFT_A   (WM_USER + 101)
 #define WM_ADD_LOG_ENTRY_RIGHT    (WM_USER + 102)
