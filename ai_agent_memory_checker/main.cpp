@@ -673,6 +673,7 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
     auto DisableButton = []() {
         EnableWindow(hBtnInject, FALSE);
         EnableWindow(hBtnInjectAll, FALSE);
+        EnableWindow(hBtnAttachMain, FALSE);
     };
 
     switch (msg) {
@@ -920,7 +921,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.17",
+        L"AI Agent Memory Checker v1.18",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr

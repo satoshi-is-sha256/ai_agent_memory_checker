@@ -6,6 +6,7 @@
 #define REALTIMECHECKING_H
 
 #include "common.h"
+#include "memorychecker.h"
 #include <fstream>
 
 constexpr DWORD EXCEPTION_INTENTIONAL_BREAKPOINT = 0x80000003;
@@ -90,13 +91,17 @@ inline std::string StartPipeTrafficSniffer(DWORD targetPid, const std::string &p
                                 SIZE_T bytesRead = 0;
 
                                 if (ReadProcessMemory(hTargetProc, pSendMessage, &sendHeader, sizeof(sendHeader), &bytesRead)) {
-                                    LPVOID pDataPayload = reinterpret_cast<LPBYTE>(pSendMessage) + sizeof(PORT_MESSAGE_HEADER) + 8; // ClientId等のオフセット調整
+                                    LPVOID pDataPayload = reinterpret_cast<LPBYTE>(pSendMessage) + sizeof(PORT_MESSAGE_HEADER) + 8;
                                     USHORT payloadSize = sendHeader.DataSize;
+
+                                    ss << AnalyzeAndHighlightPayload((const unsigned char *)&sendHeader, bytesRead, reinterpret_cast<uintptr_t>(pDataPayload), true);
 
                                     if (payloadSize > 0 && payloadSize < 8192) {
                                         std::vector<BYTE> alpcData(payloadSize);
                                         if (ReadProcessMemory(hTargetProc, pDataPayload, alpcData.data(), payloadSize, &bytesRead)) {
                                             std::string payload(reinterpret_cast<char*>(alpcData.data()), bytesRead);
+
+                                            ss << AnalyzeAndHighlightPayload((const unsigned char *)&sendHeader, bytesRead, reinterpret_cast<uintptr_t>(pDataPayload), true);
 
                                             ss << "[ALPC-SEND] Port: 0x" << std::hex << hPort
                                                << " | Size: " << std::dec << bytesRead << " bytes\n";
@@ -114,10 +119,14 @@ inline std::string StartPipeTrafficSniffer(DWORD targetPid, const std::string &p
                                     LPVOID pDataPayload = reinterpret_cast<LPBYTE>(pReceiveMessage) + sizeof(PORT_MESSAGE_HEADER) + 8;
                                     USHORT payloadSize = recvHeader.DataSize;
 
+                                    ss << AnalyzeAndHighlightPayload((const unsigned char *)&recvHeader, bytesRead, reinterpret_cast<uintptr_t>(pDataPayload), false);
+
                                     if (payloadSize > 0 && payloadSize < 8192) {
                                         std::vector<BYTE> alpcData(payloadSize);
                                         if (ReadProcessMemory(hTargetProc, pDataPayload, alpcData.data(), payloadSize, &bytesRead)) {
                                             std::string payload(reinterpret_cast<char*>(alpcData.data()), bytesRead);
+
+                                            ss << AnalyzeAndHighlightPayload((const unsigned char *)&recvHeader, bytesRead, reinterpret_cast<uintptr_t>(pDataPayload), false);
 
                                             ss << "[ALPC-RECV] Port: 0x" << std::hex << hPort
                                                << " | Size: " << std::dec << bytesRead << " bytes\n";
@@ -149,11 +158,15 @@ inline std::string StartPipeTrafficSniffer(DWORD targetPid, const std::string &p
                                         LPVOID pDataPayload = reinterpret_cast<LPBYTE>(pSendMessage) + sizeof(PORT_MESSAGE_HEADER) + 8;
                                         USHORT payloadSize = msgHeader.DataSize;
 
+                                        ss << AnalyzeAndHighlightPayload((const unsigned char *)&msgHeader, bytesRead, reinterpret_cast<uintptr_t>(pDataPayload), true);
+
                                         if (payloadSize > 0 && payloadSize < 4096) {
                                             std::vector<BYTE> alpcData(payloadSize);
                                             if (ReadProcessMemory(hTargetProc2, pDataPayload, alpcData.data(), payloadSize, &bytesRead)) {
                                                 std::string alpcPayload(reinterpret_cast<char*>(alpcData.data()), bytesRead);
-                                    
+
+                                                ss << AnalyzeAndHighlightPayload((const unsigned char *)&msgHeader, bytesRead, reinterpret_cast<uintptr_t>(pDataPayload), true);
+
                                                 ss << "[ALPC-SNIFF] Unnamed/Named ALPC Traffic Captured!\n";
                                                 ss << "             Port Handle: 0xstd::hex" << hPort << "\n";
                                                 ss << "             Data Size: " << std::dec << bytesRead << " bytes\n";
@@ -177,6 +190,9 @@ inline std::string StartPipeTrafficSniffer(DWORD targetPid, const std::string &p
                             HANDLE hTargetProc2 = OpenProcess(PROCESS_VM_READ, FALSE, de.dwProcessId);
                             if (hTargetProc2) {
                                 if (ReadProcessMemory(hTargetProc2, lpBuffer, data.data(), bufferSize, &bytesRead)) {
+
+                                    ss << AnalyzeAndHighlightPayload((const unsigned char *)data.data(), bytesRead, reinterpret_cast<uintptr_t>(lpBuffer), true);
+
                                     std::string payload(reinterpret_cast<char*>(data.data()), bytesRead);
                                     ss << "[>>>] Pipe I/O Captured! Handle: 0x" << std::hex << hFile
                                         << " | Size: " << std::dec << bytesRead << " bytes\n";
