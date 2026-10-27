@@ -13,10 +13,25 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="ソース ファイル\detours">
+      <UniqueIdentifier>{3e632fe8-5b16-4629-80e9-5048c8d07f16}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ヘッダー ファイル\detours">
+      <UniqueIdentifier>{908eb175-38c4-4bbe-83a2-72fa9c842879}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
       <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="detours.cpp">
+      <Filter>ソース ファイル\detours</Filter>
+    </ClCompile>
+    <ClCompile Include="disasm.cpp">
+      <Filter>ソース ファイル\detours</Filter>
+    </ClCompile>
+    <ClCompile Include="modules.cpp">
+      <Filter>ソース ファイル\detours</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -55,6 +70,9 @@
     </ClInclude>
     <ClInclude Include="memorychecker.h">
       <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="detours.h">
+      <Filter>ヘッダー ファイル\detours</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

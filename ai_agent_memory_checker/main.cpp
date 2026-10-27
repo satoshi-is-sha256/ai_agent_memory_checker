@@ -22,6 +22,10 @@ HWND g_hWnd = nullptr;
 HWND g_hEditProcessName = nullptr;
 bool g_thread = false;
 
+// alpc.h
+pfnNtAlpcCreatePort NtAlpcCreatePortOrg = nullptr;
+std::string g_NtAlpcCreatePortLogs;
+
 static std::string RunDebuggerForensics(DWORD targetProcessId) {
     std::ostringstream stream;
     stream << "[*] Starting Debugger Forensics for PID: " << targetProcessId << std::endl;
@@ -454,6 +458,9 @@ static void PipeServerThread() {
                 for (auto targetPid : pids) {
                     ss << InspectAlpcAndPipes(targetPid, WStringToString(std::wstring(procNameBuf)));
                 }
+
+                ss << "Unname Pipe Logs: " << g_NtAlpcCreatePortLogs << " ---\n\n";
+
                 std::string logStr = ss.str();
                 char* pText = new char[logStr.size() + 1];
                 strcpy_s(pText, logStr.size() + 1, logStr.c_str());
@@ -921,7 +928,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.18",
+        L"AI Agent Memory Checker v1.19",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
@@ -935,11 +942,15 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     ShowWindow(g_hWnd, nCmdShow);
     UpdateWindow(g_hWnd);
 
+    InitializeAlpcHooks();
+
     MSG msg;
     while (GetMessageW(&msg, nullptr, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessageW(&msg);
     }
+
+    UninitializeAlpcHooks();
 
     UnregisterClassW(wc.lpszClassName, wc.hInstance);
     return static_cast<int>(msg.wParam);

@@ -2,6 +2,7 @@
 #define ALPC_H
 
 #include "common.h"
+#include "detours.h"
 
 typedef NTSTATUS(NTAPI *PFN_NT_QUERY_OBJECT)(HANDLE Handle, OBJECT_INFORMATION_CLASS ObjectInformationClass, PVOID ObjectInformation, ULONG ObjectInformationLength, PULONG ReturnLength);
 
@@ -97,6 +98,69 @@ inline std::string InspectAlpcAndPipes(DWORD targetPid, const std::string &proce
     ss << "--------------------------------------------------------------------\n";
 
     return ss.str();
+}
+
+typedef NTSTATUS(NTAPI* pfnNtAlpcCreatePort)(PHANDLE PortHandle, POBJECT_ATTRIBUTES ObjectAttributes, PVOID PortAttributes);
+extern pfnNtAlpcCreatePort NtAlpcCreatePortOrg; // main.cpp
+extern std::string g_NtAlpcCreatePortLogs; // main.cpp
+
+inline std::string CapturePortOriginStackTrace() {
+    const int maxFrames = 10;
+    void *stack[maxFrames];
+
+    USHORT frames = RtlCaptureStackBackTrace(2, maxFrames, stack, nullptr);
+    
+    std::ostringstream oss;
+    oss << "Stack [ ";
+    for (USHORT i = 0; i < frames; ++i) {
+        oss << "0x" << std::hex << stack[i] << " ";
+    }
+    oss << "]";
+    return oss.str();
+}
+
+inline NTSTATUS NTAPI Hooked_NtAlpcCreatePort(PHANDLE PortHandle, POBJECT_ATTRIBUTES ObjectAttributes, PVOID PortAttributes) {
+    std::string portName = "(Unnamed)";
+    if (ObjectAttributes && ObjectAttributes->ObjectName && ObjectAttributes->ObjectName->Buffer) {
+        int len = WideCharToMultiByte(CP_ACP, 0, ObjectAttributes->ObjectName->Buffer, ObjectAttributes->ObjectName->Length / sizeof(WCHAR), nullptr, 0, nullptr, nullptr);
+        if (len > 0) {
+            std::string temp(len, '\0');
+            WideCharToMultiByte(CP_ACP, 0, ObjectAttributes->ObjectName->Buffer, ObjectAttributes->ObjectName->Length / sizeof(WCHAR), &temp[0], len, nullptr, nullptr);
+            portName = temp;
+        }
+    }
+
+    std::string originStack = CapturePortOriginStackTrace();
+
+    std::ostringstream logBuilder;
+    logBuilder << "[ALPC-CREATE] PortName: " << portName << "\r\n";
+    logBuilder << "  -> Origin Stack: " << originStack << "\r\n";
+
+    g_NtAlpcCreatePortLogs += logBuilder.str();
+
+    return NtAlpcCreatePortOrg(PortHandle, ObjectAttributes, PortAttributes);
+}
+
+inline bool InitializeAlpcHooks() {
+    HMODULE hNtdll = GetModuleHandleW(L"ntdll.dll");
+    if (!hNtdll) return false;
+
+    NtAlpcCreatePortOrg = (pfnNtAlpcCreatePort)GetProcAddress(hNtdll, "NtAlpcCreatePort");
+    if (!NtAlpcCreatePortOrg) return false;
+
+    DetourAttach(&(PVOID&)NtAlpcCreatePortOrg, Hooked_NtAlpcCreatePort);
+    return true;
+}
+
+inline void UninitializeAlpcHooks() {
+    if (NtAlpcCreatePortOrg) {
+        DetourTransactionBegin();
+        DetourUpdateThread(GetCurrentThread());
+        
+        DetourDetach(&(PVOID&)NtAlpcCreatePortOrg, Hooked_NtAlpcCreatePort);
+        
+        DetourTransactionCommit();
+    }
 }
 
 #endif
