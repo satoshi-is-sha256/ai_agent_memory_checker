@@ -74,5 +74,8 @@
     <ClInclude Include="detours.h">
       <Filter>ヘッダー ファイル\detours</Filter>
     </ClInclude>
+    <ClInclude Include="promptInspector.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

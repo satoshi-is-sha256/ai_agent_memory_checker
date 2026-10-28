@@ -6,6 +6,7 @@
 #define MEMORYCHECKER_H
 
 #include "common.h"
+#include "promptInspector.h"
 #include <unordered_map>
 #include <algorithm>
 
@@ -109,6 +110,11 @@ inline std::string AnalyzeAndHighlightPayload(const unsigned char *buffer, size_
             ss << std::hex << std::setw(2) << std::setfill('0') << (int)buffer[i] << " ";
         }
         ss << std::dec << "\n";
+    }
+
+    std::string aiInspectionResult = InspectAiModelPayload(payloadStr);
+    if (!aiInspectionResult.empty()) {
+        ss << aiInspectionResult;
     }
 
     return ss.str();
