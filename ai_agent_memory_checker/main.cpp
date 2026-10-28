@@ -17,6 +17,7 @@
 #include "alpc.h"
 #include "realtimechecking.h"
 #include "treeprocess.h"
+#include "logs.h"
 
 HWND g_hWnd = nullptr;
 HWND g_hEditProcessName = nullptr;
@@ -481,7 +482,7 @@ static void PipeServerThread() {
                 fLogRight = false;
             }
 
-            COLORREF logColor = RGB(255, 180, 0);
+            //COLORREF logColor = RGB(255, 180, 0);
             wchar_t procNameBuf[256] = { 0 };
             GetWindowTextW(g_hEditProcessName, procNameBuf, 256);
 
@@ -493,14 +494,48 @@ static void PipeServerThread() {
                 for (auto targetPid : pids) {
                     ss << StartPipeTrafficSniffer(targetPid, WStringToString(std::wstring(procNameBuf)));
                 }
-                std::string logStr = ss.str();
-                char* pText = new char[logStr.size() + 1];
-                strcpy_s(pText, logStr.size() + 1, logStr.c_str());
 
-                PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY_RIGHT_A, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
+                LogQueueManager::GetInstanceRight().PushLog(ss.str());
+
+                //std::string logStr = ss.str();
+                //char* pText = new char[logStr.size() + 1];
+                //strcpy_s(pText, logStr.size() + 1, logStr.c_str());
+
+                //PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY_RIGHT_A, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
             }
         }
         catch (const std::string&) {}
+
+        static int logs_counter = 0;
+        if(++logs_counter == 20) {
+            {
+                COLORREF logColor = RGB(255, 180, 0);
+                std::vector<std::string> outLogs;
+                if(LogQueueManager::GetInstanceLeft().FlushLogs(outLogs)) {
+                    for(const auto &logStr: outLogs) {
+                        char *pText = new char[logStr.size() + 1];
+                        strcpy_s(pText, logStr.size() + 1, logStr.c_str());
+
+                        PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY_LEFT_A, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
+                    }
+                }
+            }
+
+            {
+                COLORREF logColor = RGB(255, 180, 0);
+                std::vector<std::string> outLogs;
+                if (LogQueueManager::GetInstanceRight().FlushLogs(outLogs)) {
+                    for (const auto &logStr : outLogs) {
+                        char *pText = new char[logStr.size() + 1];
+                        strcpy_s(pText, logStr.size() + 1, logStr.c_str());
+
+                        PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY_RIGHT_A, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
+                    }
+                }
+            }
+
+            logs_counter = 0;
+        }
 
         /**
         * The following code is no longer needed because AI security investigations via DLL injection were blocked on October 16, 2026 (GPT-6 Astra).
@@ -928,7 +963,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.20",
+        L"AI Agent Memory Checker v1.21",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
