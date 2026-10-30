@@ -86,5 +86,11 @@
     <ClInclude Include="alpcback.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="processtree.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="diskio.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

@@ -6,6 +6,7 @@
 #define MEMORYDETECTOR_H
 
 #include "common.h"
+#include <regex>
 
 inline bool IsTargetWatched(DWORD targetPid, DWORD specifiedTargetPid, const std::string &targetName, const std::string &targetNameFilter) {
     if (specifiedTargetPid != 0 && targetPid == specifiedTargetPid) {

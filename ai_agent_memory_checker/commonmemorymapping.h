@@ -65,6 +65,10 @@ class CCommonMemory {
                 ss << "  -> View Size: " << *ViewSize << " bytes\r\n";
             }
 
+            SharedMemoryRegion obj({ *BaseAddress, *ViewSize, SectionHandle });
+            ss << ScanSharedMemoryContent(obj);
+            ss << DeepScanSharedMemoryBuffer(obj);
+
             g_NtAlpcCreatePortLogs += ss.str();
 
             return status;
@@ -82,6 +86,26 @@ class CCommonMemory {
                     << std::hex << region.baseAddress << std::dec << "\r\n";
                 oss << "  -> Snippet: " << content.substr(0, 300) << "\r\n";
                 return oss.str();
+            }
+
+            return "";
+        }
+
+        static std::string DeepScanSharedMemoryBuffer(const SharedMemoryRegion &region) {
+            if (!region.baseAddress || region.viewSize == 0) return "";
+            size_t scanSize = region.viewSize < 65536 ? region.viewSize : 65536;
+
+            std::string buffer((const char *)region.baseAddress, scanSize);
+            if (buffer.find("prompt") != std::string::npos ||
+                buffer.find("messages") != std::string::npos ||
+                buffer.find("content") != std::string::npos) {
+
+                std::ostringstream ss;
+                ss << "[DEEP-SCAN] AI Context/Payload Detected in Shared Memory!\r\n";
+                ss << "  -> BaseAddress: 0x" << std::hex << region.baseAddress << std::dec << "\r\n";
+                ss << "  -> Snippet: " << buffer.substr(0, 500) << "\r\n";
+
+                return ss.str();
             }
 
             return "";

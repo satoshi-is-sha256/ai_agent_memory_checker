@@ -140,9 +140,11 @@
     <ClInclude Include="commonmemorymapping.h" />
     <ClInclude Include="debugger.h" />
     <ClInclude Include="detours.h" />
+    <ClInclude Include="diskio.h" />
     <ClInclude Include="logs.h" />
     <ClInclude Include="memorychecker.h" />
     <ClInclude Include="memorydetector.h" />
+    <ClInclude Include="processtree.h" />
     <ClInclude Include="promptInspector.h" />
     <ClInclude Include="realtimechecking.h" />
     <ClInclude Include="scanincoming.h" />

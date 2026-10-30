@@ -20,6 +20,8 @@
 #include "logs.h"
 #include "commonmemorymapping.h"
 #include "alpcback.h"
+#include "processtree.h"
+#include "diskio.h"
 
 HWND g_hWnd = nullptr;
 HWND g_hEditProcessName = nullptr;
@@ -38,6 +40,9 @@ std::mutex CCommonMemory::RegionMutex;
 // alpcback.h
 CALPCBACK::pfnNtCreateNamedPipeFile CALPCBACK::Original_NtCreateNamedPipeFile;
 std::mutex CALPCBACK::g_PipeMutex;
+
+// dislio.h
+pfnNtWriteFile CDiskIo::Original_NtWriteFile;
 
 static std::string RunDebuggerForensics(DWORD targetProcessId) {
     std::ostringstream stream;
@@ -975,7 +980,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.23",
+        L"AI Agent Memory Checker v1.24",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
@@ -992,6 +997,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     InitializeAlpcHooks();
     CCommonMemory::InitializeSectionHooks();
     CALPCBACK::InitializeNamedPipeHooks();
+    CDiskIo::InitializeFileIoHooks();
 
     MSG msg;
     while (GetMessageW(&msg, nullptr, 0, 0)) {
@@ -1002,6 +1008,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     UninitializeAlpcHooks();
     CCommonMemory::UninitializeSectionHooks();
     CALPCBACK::UninitializeNamedPipeHooks();
+    CDiskIo::UninitializeFileIoHooks();
 
     UnregisterClassW(wc.lpszClassName, wc.hInstance);
     return static_cast<int>(msg.wParam);
