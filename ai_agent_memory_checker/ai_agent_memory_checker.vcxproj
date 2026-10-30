@@ -133,6 +133,7 @@
   <ItemGroup>
     <ClInclude Include="allsystemhandlesex.h" />
     <ClInclude Include="alpc.h" />
+    <ClInclude Include="alpcback.h" />
     <ClInclude Include="checkopenhandles.h" />
     <ClInclude Include="commemory.h" />
     <ClInclude Include="common.h" />
