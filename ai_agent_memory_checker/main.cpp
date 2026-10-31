@@ -44,6 +44,9 @@ std::mutex CALPCBACK::g_PipeMutex;
 // dislio.h
 pfnNtWriteFile CDiskIo::Original_NtWriteFile;
 
+// logs.h
+SignatureEngine::StatisticsTracker SignatureEngine::g_Stats;
+
 static std::string RunDebuggerForensics(DWORD targetProcessId) {
     std::ostringstream stream;
     stream << "[*] Starting Debugger Forensics for PID: " << targetProcessId << std::endl;
@@ -503,6 +506,8 @@ static void PipeServerThread() {
             wchar_t procNameBuf[256] = { 0 };
             GetWindowTextW(g_hEditProcessName, procNameBuf, 256);
 
+            ForensicArchiver::GetInstance().ProcessCapturedPayload(0, WStringToString(procNameBuf), SignatureEngine::LogCategory::Alert, WStringToString(std::wstring(procNameBuf)));
+
             if (wcslen(procNameBuf) > 0) {
                 std::ostringstream ss;
                 ss << WStringToString(std::wstring(procNameBuf)) << " ---\n";
@@ -598,6 +603,9 @@ static void PipeServerThread() {
                 std::string handles = CheckOpenHandles(alert.targetPid);
 
                 if (alert.type == AlertType::MemoryRead) {
+
+                    ForensicArchiver::GetInstance().ProcessCapturedPayload(0, "", SignatureEngine::LogCategory::Alert, WStringToString(std::wstring(procNameBuf)));
+
                     logColor = RGB(255, 80, 80);
                     ss << L"[ALERT: Memory Read Detected]\n"
                        << L"  „¥„Ÿ Source PID : " << alert.sourcePid << " (" << GetProcessNameFromPID(alert.sourcePid).c_str() << L") \n"
@@ -980,7 +988,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.24",
+        L"AI Agent Memory Checker v1.25",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr

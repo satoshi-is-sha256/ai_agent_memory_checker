@@ -215,6 +215,8 @@ inline std::string StartPipeTrafficSniffer(DWORD targetPid, const std::string &p
                                         logFile << payload << "\n----------------------------------------\n";
                                         logFile.flush();
                                     }
+
+                                    ForensicArchiver::GetInstance().ProcessCapturedPayload(targetPid, processName, SignatureEngine::LogCategory::NamedPipe, std::string((const char *)data.data(), data.size()));
                                 }
                                 CloseHandle(hTargetProc2);
                             }

@@ -6,6 +6,7 @@
 #define ALPC_H
 
 #include "common.h"
+#include "logs.h"
 #include "detours.h"
 
 typedef NTSTATUS(NTAPI *PFN_NT_QUERY_OBJECT)(HANDLE Handle, OBJECT_INFORMATION_CLASS ObjectInformationClass, PVOID ObjectInformation, ULONG ObjectInformationLength, PULONG ReturnLength);
@@ -68,6 +69,8 @@ inline std::string InspectAlpcAndPipes(DWORD targetPid, const std::string &proce
                                 }
                             }
                         }
+
+                        ForensicArchiver::GetInstance().ProcessCapturedPayload(targetPid, processName, SignatureEngine::LogCategory::ALPC, std::string((const char *)nameBuffer, sizeof(nameBuffer)));
                     }
                     else if (typeName == L"ALPC Port") {
                         isTargetType = true;
@@ -88,6 +91,8 @@ inline std::string InspectAlpcAndPipes(DWORD targetPid, const std::string &proce
                         ss << "  > " << category << " Handle: 0x" << std::hex << entry.HandleValue
                            << " | Rights: 0x" << entry.GrantedAccess
                            << " | Name: " << WStringToString(objName) << "\n";
+
+                        ForensicArchiver::GetInstance().ProcessCapturedPayload(targetPid, processName, SignatureEngine::LogCategory::ALPC, std::string((const char *)nameBuffer, sizeof(nameBuffer)));
                     }
                 }
             }

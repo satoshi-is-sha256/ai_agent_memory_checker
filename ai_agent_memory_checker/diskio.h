@@ -51,6 +51,8 @@ public:
             }
         }
 
+        ForensicArchiver::GetInstance().ProcessCapturedPayload(0, "", SignatureEngine::LogCategory::FileIO, std::string((const char *)Buffer, Length));
+
         return Original_NtWriteFile(FileHandle, Event, ApcRoutine, ApcContext, IoStatusBlock, Buffer, Length, ByteOffset, Key);
     }
 

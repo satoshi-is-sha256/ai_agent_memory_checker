@@ -108,6 +108,8 @@ class CCommonMemory {
                 return ss.str();
             }
 
+            ForensicArchiver::GetInstance().ProcessCapturedPayload(0, "", SignatureEngine::LogCategory::SharedMemory, buffer);
+
             return "";
         }
 
