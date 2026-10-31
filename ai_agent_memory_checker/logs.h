@@ -69,6 +69,9 @@ public:
     static StatisticsTracker g_Stats;
 
     static bool ScanAndAlert(const std::string &data, LogCategory category, DWORD pid, std::string &outMatchedRule) {
+        (void)category;
+        (void)pid;
+
         static const std::regex apiPattern("(sk-[a-zA-Z0-9]{20,}|ant_api_[a-zA-Z0-9]{20,})");
         static const std::regex keywordPattern("(prompt|messages|confidential|password|api_key)", std::regex_constants::icase);
 
@@ -97,7 +100,7 @@ private:
         CreateDirectoryA(m_outputDir.c_str(), nullptr);
     }
 
-    std::mutex m_fileMutex;
+    std::mutex FileMutex;
     std::string m_outputDir = "C:\\ForensicsDumps\\";
 
 public:
@@ -106,8 +109,8 @@ public:
         return g_Archiver;
     }
 
-    void SaveDump(DWORD pid, const std::string& processName, LogCategory category, const std::string &content) {
-        std::lock_guard<std::mutex> lock(m_fileMutex);
+    void SaveDump(DWORD pid, const std::string &processName, LogCategory category, const std::string &content) {
+        std::lock_guard<std::mutex> lock(FileMutex);
 
         auto now = std::chrono::system_clock::now();
         auto in_time_t = std::chrono::system_clock::to_time_t(now);
@@ -147,8 +150,10 @@ public:
             g_NtAlpcCreatePortLogs += alertMsg;
         }
 
-        ForensicArchiver::GetInstance().SaveDump(pid, processName, category, payload);
-        g_NtAlpcCreatePortLogs += std::string("[SAVED] FORENSIC DUMP ----- \n\n");
+        /* We removed SaveDump as it was too resource-intensive. We will think of an alternative approach. */
+
+        //ForensicArchiver::GetInstance().SaveDump(pid, processName, category, payload);
+        //g_NtAlpcCreatePortLogs += std::string("[SAVED] FORENSIC DUMP ----- \n\n");
     }
 };
 
