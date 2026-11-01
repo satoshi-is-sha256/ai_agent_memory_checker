@@ -145,6 +145,7 @@
     <ClInclude Include="logs.h" />
     <ClInclude Include="memorychecker.h" />
     <ClInclude Include="memorydetector.h" />
+    <ClInclude Include="network.h" />
     <ClInclude Include="processtree.h" />
     <ClInclude Include="promptInspector.h" />
     <ClInclude Include="realtimechecking.h" />

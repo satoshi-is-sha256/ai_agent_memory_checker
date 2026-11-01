@@ -135,6 +135,8 @@ public:
     }
 
     void ProcessCapturedPayload(DWORD pid, const std::string &processName, LogCategory category, const std::string &payload) {
+        (void)processName;
+
         switch (category) {
         case LogCategory::ALPC:         g_Stats.alpcCount++; break;
         case LogCategory::SharedMemory: g_Stats.sharedMemCount++; break;
