@@ -24,6 +24,7 @@
 #include "diskio.h"
 #include "network.h"
 #include "timelinecorrelator.h"
+#include "processuser.h"
 
 HWND g_hWnd = nullptr;
 HWND g_hEditProcessName = nullptr;
@@ -52,6 +53,10 @@ SignatureEngine::StatisticsTracker SignatureEngine::g_Stats;
 // network.h
 pfnConnect CNetwork::Original_connect;
 pfnHttpSendRequestW CNetwork::Original_HttpSendRequestW;
+
+// processuser.h
+pfnNtCreateUserProcess CProcessUser::Original_NtCreateUserProcess;
+pfnNtCreateProcessEx CProcessUser::Original_NtCreateProcessEx;
 
 static std::string RunDebuggerForensics(DWORD targetProcessId) {
     std::ostringstream stream;
@@ -994,7 +999,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.27",
+        L"AI Agent Memory Checker v1.28",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
@@ -1013,6 +1018,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CALPCBACK::InitializeNamedPipeHooks();
     CDiskIo::InitializeFileIoHooks();
     CNetwork::InitializeNetworkHooks();
+    CProcessUser::InitializeProcessCreationHooks();
 
     MSG msg;
     while (GetMessageW(&msg, nullptr, 0, 0)) {
@@ -1025,6 +1031,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CALPCBACK::UninitializeNamedPipeHooks();
     CDiskIo::UninitializeFileIoHooks();
     CNetwork::UninitializeNetworkHooks();
+    CProcessUser::UninitializeProcessCreationHooks();
 
     UnregisterClassW(wc.lpszClassName, wc.hInstance);
     return static_cast<int>(msg.wParam);
