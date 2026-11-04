@@ -151,6 +151,7 @@
     <ClInclude Include="processuser.h" />
     <ClInclude Include="promptInspector.h" />
     <ClInclude Include="realtimechecking.h" />
+    <ClInclude Include="report.h" />
     <ClInclude Include="scanincoming.h" />
     <ClInclude Include="tcp.h" />
     <ClInclude Include="timelinecorrelator.h" />
