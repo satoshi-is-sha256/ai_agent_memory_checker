@@ -8,6 +8,8 @@
 #include "common.h"
 #include "alpc.h"
 #include "detours.h"
+#include "mojopayloadparser.h"
+#include "timelinecorrelator.h"
 
 typedef NTSTATUS(NTAPI *pfnNtWriteFile) (
     HANDLE FileHandle,
@@ -41,6 +43,14 @@ public:
     ) {
         if (Buffer && Length > 0 && Length < 4096) {
             std::string data((const char*)Buffer, Length);
+
+            auto parsedResult = MojoPayloadParser::Parse(Buffer, Length);
+            if (parsedResult.hasJson || !parsedResult.keywordsFound.empty()) {
+                std::string logDetails = "[PIPE-DATA-INSPECT] Suspicious Mojo IPC Payload Detected!\n" +
+                MojoPayloadParser::FormatParsedResult(parsedResult);
+                TimelineCorrelator::GetInstance().PushEvent(GetCurrentProcessId(), "ChatGPT.exe", TimelineCorrelator::TimelineCategory::SharedMemory, logDetails);
+            }
+
             if (data.find("prompt") != std::string::npos || data.find("user") != std::string::npos) {
                 std::ostringstream ss;
                 ss << "[FILE-IO-LEAK] Potential Payload Written to Disk/Cache\r\n";
