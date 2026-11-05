@@ -28,6 +28,7 @@
 #include "mojopayloadparser.h"
 #include "report.h"
 #include "registrypersistencetracker.h"
+#include "portscan.h"
 
 HWND g_hWnd = nullptr;
 HWND g_hEditProcessName = nullptr;
@@ -38,31 +39,35 @@ pfnNtAlpcCreatePort NtAlpcCreatePortOrg = nullptr;
 std::string g_NtAlpcCreatePortLogs;
 
 // commonmemorymapping.h
-pfnNtCreateSection CCommonMemory::Original_NtCreateSection;
-pfnNtMapViewOfSection CCommonMemory::Original_NtMapViewOfSection;
+pfnNtCreateSection CCommonMemory::Original_NtCreateSection = nullptr;
+pfnNtMapViewOfSection CCommonMemory::Original_NtMapViewOfSection = nullptr;
 std::vector<CCommonMemory::SharedMemoryRegion> CCommonMemory::SharedRegions;
 std::mutex CCommonMemory::RegionMutex;
 
 // alpcback.h
-CALPCBACK::pfnNtCreateNamedPipeFile CALPCBACK::Original_NtCreateNamedPipeFile;
+CALPCBACK::pfnNtCreateNamedPipeFile CALPCBACK::Original_NtCreateNamedPipeFile = nullptr;
 std::mutex CALPCBACK::g_PipeMutex;
 
 // dislio.h
-pfnNtWriteFile CDiskIo::Original_NtWriteFile;
+pfnNtWriteFile CDiskIo::Original_NtWriteFile = nullptr;
 
 // logs.h
 SignatureEngine::StatisticsTracker SignatureEngine::g_Stats;
 
 // network.h
-pfnConnect CNetwork::Original_connect;
-pfnHttpSendRequestW CNetwork::Original_HttpSendRequestW;
+pfnConnect CNetwork::Original_connect = nullptr;
+pfnHttpSendRequestW CNetwork::Original_HttpSendRequestW = nullptr;
 
 // processuser.h
-pfnNtCreateUserProcess CProcessUser::Original_NtCreateUserProcess;
-pfnNtCreateProcessEx CProcessUser::Original_NtCreateProcessEx;
+pfnNtCreateUserProcess CProcessUser::Original_NtCreateUserProcess = nullptr;
+pfnNtCreateProcessEx CProcessUser::Original_NtCreateProcessEx = nullptr;
 
 // registrypersistence.h
-pfnRegSetValueExW CRegistryPersistence::Original_RegSetValueExW;
+pfnRegSetValueExW CRegistryPersistence::Original_RegSetValueExW = nullptr;
+
+// portscan.h
+pfnBind CPortScan::Original_bind = nullptr;
+pfnConnect CPortScan::Original_connect = nullptr;
 
 static std::string RunDebuggerForensics(DWORD targetProcessId) {
     std::ostringstream stream;
@@ -1005,7 +1010,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.31",
+        L"AI Agent Memory Checker v1.32",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
@@ -1026,6 +1031,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CNetwork::InitializeNetworkHooks();
     CProcessUser::InitializeProcessCreationHooks();
     CRegistryPersistence::InitializePersistenceHooks();
+    CPortScan::InitializeLoopbackHooks();
 
     MSG msg;
     while (GetMessageW(&msg, nullptr, 0, 0)) {
@@ -1040,6 +1046,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CNetwork::UninitializeNetworkHooks();
     CProcessUser::UninitializeProcessCreationHooks();
     CRegistryPersistence::UninitializePersistenceHooks();
+    CPortScan::UninitializeLoopbackHooks();
 
     UnregisterClassW(wc.lpszClassName, wc.hInstance);
     return static_cast<int>(msg.wParam);
