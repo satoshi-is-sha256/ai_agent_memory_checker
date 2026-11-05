@@ -27,6 +27,7 @@
 #include "processuser.h"
 #include "mojopayloadparser.h"
 #include "report.h"
+#include "registrypersistencetracker.h"
 
 HWND g_hWnd = nullptr;
 HWND g_hEditProcessName = nullptr;
@@ -59,6 +60,9 @@ pfnHttpSendRequestW CNetwork::Original_HttpSendRequestW;
 // processuser.h
 pfnNtCreateUserProcess CProcessUser::Original_NtCreateUserProcess;
 pfnNtCreateProcessEx CProcessUser::Original_NtCreateProcessEx;
+
+// registrypersistence.h
+pfnRegSetValueExW CRegistryPersistence::Original_RegSetValueExW;
 
 static std::string RunDebuggerForensics(DWORD targetProcessId) {
     std::ostringstream stream;
@@ -1001,7 +1005,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.30",
+        L"AI Agent Memory Checker v1.31",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
@@ -1021,6 +1025,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CDiskIo::InitializeFileIoHooks();
     CNetwork::InitializeNetworkHooks();
     CProcessUser::InitializeProcessCreationHooks();
+    CRegistryPersistence::InitializePersistenceHooks();
 
     MSG msg;
     while (GetMessageW(&msg, nullptr, 0, 0)) {
@@ -1034,6 +1039,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CDiskIo::UninitializeFileIoHooks();
     CNetwork::UninitializeNetworkHooks();
     CProcessUser::UninitializeProcessCreationHooks();
+    CRegistryPersistence::UninitializePersistenceHooks();
 
     UnregisterClassW(wc.lpszClassName, wc.hInstance);
     return static_cast<int>(msg.wParam);
