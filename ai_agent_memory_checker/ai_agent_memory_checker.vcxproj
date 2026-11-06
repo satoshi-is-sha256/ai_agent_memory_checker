@@ -160,6 +160,7 @@
     <ClInclude Include="registrypersistencetracker.h" />
     <ClInclude Include="report.h" />
     <ClInclude Include="scanincoming.h" />
+    <ClInclude Include="sslkeylogmonitor.h" />
     <ClInclude Include="tcp.h" />
     <ClInclude Include="timelinecorrelator.h" />
     <ClInclude Include="treeprocess.h" />
