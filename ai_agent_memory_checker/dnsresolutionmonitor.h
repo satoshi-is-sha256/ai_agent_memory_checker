@@ -21,6 +21,9 @@ typedef int(WINAPI *pfnGetaddrinfo)(
     PADDRINFOA* ppResult
 );
 
+//
+// The logs hooked here are output from the log strings defined in alpc.h (g_NtAlpcCreatePortLogs).
+//
 class CDnsResolution {
 public:
     static pfnGetaddrinfo Original_getaddrinfo;
