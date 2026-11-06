@@ -153,6 +153,7 @@
     <ClInclude Include="logs.h" />
     <ClInclude Include="memorychecker.h" />
     <ClInclude Include="memorydetector.h" />
+    <ClInclude Include="memoryscanner.h" />
     <ClInclude Include="mojopayloadparser.h" />
     <ClInclude Include="network.h" />
     <ClInclude Include="portscan.h" />
