@@ -44,6 +44,7 @@
 #include "forensicauditlogger.h"
 #include "networkconnectionmapper.h"
 #include "crashdumphandler.h"
+#include "comobjectmonitor.h"
 
 HWND g_hWnd = nullptr;
 HWND g_hEditProcessName = nullptr;
@@ -108,6 +109,9 @@ pfnSetWindowsHookExW CGlobalHookMonitor::Original_SetWindowsHookExW;
 
 // dpapimonitor.h
 pfnCryptUnprotectData CCryptoPapiMonitor::Original_CryptUnprotectData = nullptr;
+
+// comobjectmonitor.h
+pfnCoCreateInstance CComObjectMonitor::Original_CoCreateInstance = nullptr;
 
 static std::string RunDebuggerForensics(DWORD targetProcessId) {
     std::ostringstream stream;
@@ -1050,7 +1054,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.47",
+        L"AI Agent Memory Checker v1.48",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
@@ -1080,6 +1084,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CAntiDebugMonitor::InitializeAntiDebugHooks();
     CGlobalHookMonitor::InitializeGlobalHookHooks();
     CCryptoPapiMonitor::InitializeDpapiHooks();
+    CComObjectMonitor::InitializeComHooks();
 
     MSG msg;
     while (GetMessageW(&msg, nullptr, 0, 0)) {
@@ -1103,6 +1108,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CAntiDebugMonitor::UninitializeAntiDebugHooks();
     CGlobalHookMonitor::UninitializeGlobalHookHooks();
     CCryptoPapiMonitor::UninitializeDpapiHooks();
+    CComObjectMonitor::UninitializeComHooks();
 
     UnregisterClassW(wc.lpszClassName, wc.hInstance);
     return static_cast<int>(msg.wParam);
