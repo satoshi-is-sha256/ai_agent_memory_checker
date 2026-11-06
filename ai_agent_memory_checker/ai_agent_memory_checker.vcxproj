@@ -148,6 +148,7 @@
     <ClInclude Include="dnsresolutionmonitor.h" />
     <ClInclude Include="dpapimonitor.h" />
     <ClInclude Include="filedrop.h" />
+    <ClInclude Include="forensicselftest.h" />
     <ClInclude Include="globalhookmonitor.h" />
     <ClInclude Include="logs.h" />
     <ClInclude Include="memorychecker.h" />
