@@ -147,6 +147,7 @@
     <ClInclude Include="diskio.h" />
     <ClInclude Include="dnsresolutionmonitor.h" />
     <ClInclude Include="filedrop.h" />
+    <ClInclude Include="globalhookmonitor.h" />
     <ClInclude Include="logs.h" />
     <ClInclude Include="memorychecker.h" />
     <ClInclude Include="memorydetector.h" />

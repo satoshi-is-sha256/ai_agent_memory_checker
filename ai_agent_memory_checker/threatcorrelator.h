@@ -12,6 +12,7 @@
 //
 // The logs hooked here are output from the log strings defined in alpc.h (g_NtAlpcCreatePortLogs).
 //
+// Singleton
 class ThreatCorrelator {
 public:
     enum class ThreatLevel {
@@ -59,7 +60,14 @@ public:
         return m_eventStream.size();
     }
 
+    static ThreatCorrelator &GetInstance() {
+        static ThreatCorrelator tcr;
+        return tcr;
+    }
+
 private:
+    ThreatCorrelator() {}
+
     std::vector<ForensicEvent> m_eventStream;
 
     std::string GetCurrentTimestamp() {
