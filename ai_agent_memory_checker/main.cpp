@@ -33,6 +33,7 @@
 #include "clipboard.h"
 #include "dnsresolutionmonitor.h"
 #include "filedrop.h"
+#include "ProcessInjectionMonitor.h"
 
 HWND g_hWnd = nullptr;
 HWND g_hEditProcessName = nullptr;
@@ -84,6 +85,9 @@ pfnGetaddrinfo CDnsResolution::Original_getaddrinfo = nullptr;
 
 // filedrop.h
 pfnCreateFileW CFileDrop::Original_CreateFileW = nullptr;
+
+// ProcessInjectionMonitor.h
+pfnNtCreateThreadEx CProcessInjection::Original_NtCreateThreadEx = nullptr;
 
 static std::string RunDebuggerForensics(DWORD targetProcessId) {
     std::ostringstream stream;
@@ -1026,7 +1030,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.36",
+        L"AI Agent Memory Checker v1.37",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
@@ -1052,6 +1056,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CCripBoard::InitializeClipboardHooks();
     CDnsResolution::InitializeDnsHooks();
     CFileDrop::InitializeFileDropHooks();
+    CProcessInjection::InitializeInjectionHooks();
 
     MSG msg;
     while (GetMessageW(&msg, nullptr, 0, 0)) {
@@ -1071,6 +1076,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CCripBoard::UninitializeClipboardHooks();
     CDnsResolution::UninitializeDnsHooks();
     CFileDrop::UninitializeFileDropHooks();
+    CProcessInjection::UninitializeInjectionHooks();
 
     UnregisterClassW(wc.lpszClassName, wc.hInstance);
     return static_cast<int>(msg.wParam);

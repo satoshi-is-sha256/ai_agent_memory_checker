@@ -152,6 +152,7 @@
     <ClInclude Include="mojopayloadparser.h" />
     <ClInclude Include="network.h" />
     <ClInclude Include="portscan.h" />
+    <ClInclude Include="ProcessInjectionMonitor.h" />
     <ClInclude Include="processtree.h" />
     <ClInclude Include="processuser.h" />
     <ClInclude Include="promptInspector.h" />
