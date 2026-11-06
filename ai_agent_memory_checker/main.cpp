@@ -30,6 +30,7 @@
 #include "registrypersistencetracker.h"
 #include "portscan.h"
 #include "cmdline.h"
+#include "clipboard.h"
 
 HWND g_hWnd = nullptr;
 HWND g_hEditProcessName = nullptr;
@@ -72,6 +73,9 @@ pfnConnect CPortScan::Original_connect = nullptr;
 
 // cmdline.h
 pfnGetCommandLineW CCmdLine::Original_GetCommandLineW = nullptr;
+
+// clipboard.h
+pfnGetClipboardData CCripBoard::Original_GetClipboardData = nullptr;
 
 static std::string RunDebuggerForensics(DWORD targetProcessId) {
     std::ostringstream stream;
@@ -1014,7 +1018,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.33",
+        L"AI Agent Memory Checker v1.34",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
@@ -1037,6 +1041,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CRegistryPersistence::InitializePersistenceHooks();
     CPortScan::InitializeLoopbackHooks();
     CCmdLine::InitializeCommandLineHooks();
+    CCripBoard::InitializeClipboardHooks();
 
     MSG msg;
     while (GetMessageW(&msg, nullptr, 0, 0)) {
@@ -1053,6 +1058,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CRegistryPersistence::UninitializePersistenceHooks();
     CPortScan::UninitializeLoopbackHooks();
     CCmdLine::UninitializeCommandLineHooks();
+    CCripBoard::UninitializeClipboardHooks();
 
     UnregisterClassW(wc.lpszClassName, wc.hInstance);
     return static_cast<int>(msg.wParam);
