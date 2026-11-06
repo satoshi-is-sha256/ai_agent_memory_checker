@@ -31,6 +31,7 @@
 #include "portscan.h"
 #include "cmdline.h"
 #include "clipboard.h"
+#include "dnsresolutionmonitor.h"
 
 HWND g_hWnd = nullptr;
 HWND g_hEditProcessName = nullptr;
@@ -76,6 +77,9 @@ pfnGetCommandLineW CCmdLine::Original_GetCommandLineW = nullptr;
 
 // clipboard.h
 pfnGetClipboardData CCripBoard::Original_GetClipboardData = nullptr;
+
+// dnsresolutionmonitor.h
+pfnGetaddrinfo CDnsResolution::Original_getaddrinfo = nullptr;
 
 static std::string RunDebuggerForensics(DWORD targetProcessId) {
     std::ostringstream stream;
@@ -1018,7 +1022,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.34",
+        L"AI Agent Memory Checker v1.35",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
@@ -1042,6 +1046,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CPortScan::InitializeLoopbackHooks();
     CCmdLine::InitializeCommandLineHooks();
     CCripBoard::InitializeClipboardHooks();
+    CDnsResolution::InitializeDnsHooks();
 
     MSG msg;
     while (GetMessageW(&msg, nullptr, 0, 0)) {
@@ -1059,6 +1064,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CPortScan::UninitializeLoopbackHooks();
     CCmdLine::UninitializeCommandLineHooks();
     CCripBoard::UninitializeClipboardHooks();
+    CDnsResolution::UninitializeDnsHooks();
 
     UnregisterClassW(wc.lpszClassName, wc.hInstance);
     return static_cast<int>(msg.wParam);
