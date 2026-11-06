@@ -46,6 +46,7 @@
 #include "crashdumphandler.h"
 #include "comobjectmonitor.h"
 #include "CallStackInspector.h"
+#include "TelemetryServer.h"
 
 HWND g_hWnd = nullptr;
 HWND g_hEditProcessName = nullptr;
@@ -1058,7 +1059,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.49",
+        L"AI Agent Memory Checker v1.50",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
@@ -1090,6 +1091,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CCryptoPapiMonitor::InitializeDpapiHooks();
     CComObjectMonitor::InitializeComHooks();
 
+    CTelemetryServer::GetInstance().Start();
+
     MSG msg;
     while (GetMessageW(&msg, nullptr, 0, 0)) {
         TranslateMessage(&msg);
@@ -1113,6 +1116,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CGlobalHookMonitor::UninitializeGlobalHookHooks();
     CCryptoPapiMonitor::UninitializeDpapiHooks();
     CComObjectMonitor::UninitializeComHooks();
+
+    CTelemetryServer::GetInstance().Stop();
 
     UnregisterClassW(wc.lpszClassName, wc.hInstance);
     return static_cast<int>(msg.wParam);

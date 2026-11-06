@@ -172,6 +172,7 @@
     <ClInclude Include="scanincoming.h" />
     <ClInclude Include="sslkeylogmonitor.h" />
     <ClInclude Include="tcp.h" />
+    <ClInclude Include="TelemetryServer.h" />
     <ClInclude Include="threatcorrelator.h" />
     <ClInclude Include="timelinecorrelator.h" />
     <ClInclude Include="treeprocess.h" />
