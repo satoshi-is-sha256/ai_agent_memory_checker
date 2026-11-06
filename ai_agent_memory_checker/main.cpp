@@ -45,6 +45,7 @@
 #include "networkconnectionmapper.h"
 #include "crashdumphandler.h"
 #include "comobjectmonitor.h"
+#include "CallStackInspector.h"
 
 HWND g_hWnd = nullptr;
 HWND g_hEditProcessName = nullptr;
@@ -112,6 +113,9 @@ pfnCryptUnprotectData CCryptoPapiMonitor::Original_CryptUnprotectData = nullptr;
 
 // comobjectmonitor.h
 pfnCoCreateInstance CComObjectMonitor::Original_CoCreateInstance = nullptr;
+
+// CallStackInspector.h
+bool CCallStackInspector::s_symInitialized = false;
 
 static std::string RunDebuggerForensics(DWORD targetProcessId) {
     std::ostringstream stream;
@@ -1054,7 +1058,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.48",
+        L"AI Agent Memory Checker v1.49",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
