@@ -135,6 +135,7 @@
     <ClInclude Include="allsystemhandlesex.h" />
     <ClInclude Include="alpc.h" />
     <ClInclude Include="alpcback.h" />
+    <ClInclude Include="AntiDebugMonitor.h" />
     <ClInclude Include="checkopenhandles.h" />
     <ClInclude Include="clipboard.h" />
     <ClInclude Include="cmdline.h" />
