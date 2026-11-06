@@ -38,6 +38,7 @@
 #include "AntiDebugMonitor.h"
 #include "threatcorrelator.h"
 #include "globalhookmonitor.h"
+#include "dpapimonitor.h"
 
 HWND g_hWnd = nullptr;
 HWND g_hEditProcessName = nullptr;
@@ -99,6 +100,9 @@ pfnCheckRemoteDebuggerPresent CAntiDebugMonitor::Original_CheckRemoteDebuggerPre
 
 // globalhookmonitor.h
 pfnSetWindowsHookExW CGlobalHookMonitor::Original_SetWindowsHookExW;
+
+// dpapimonitor.h
+pfnCryptUnprotectData CCryptoPapiMonitor::Original_CryptUnprotectData = nullptr;
 
 static std::string RunDebuggerForensics(DWORD targetProcessId) {
     std::ostringstream stream;
@@ -1041,7 +1045,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.41",
+        L"AI Agent Memory Checker v1.42",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
@@ -1070,6 +1074,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CProcessInjection::InitializeInjectionHooks();
     CAntiDebugMonitor::InitializeAntiDebugHooks();
     CGlobalHookMonitor::InitializeGlobalHookHooks();
+    CCryptoPapiMonitor::InitializeDpapiHooks();
 
     MSG msg;
     while (GetMessageW(&msg, nullptr, 0, 0)) {
@@ -1092,6 +1097,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CProcessInjection::UninitializeInjectionHooks();
     CAntiDebugMonitor::UninitializeAntiDebugHooks();
     CGlobalHookMonitor::UninitializeGlobalHookHooks();
+    CCryptoPapiMonitor::UninitializeDpapiHooks();
 
     UnregisterClassW(wc.lpszClassName, wc.hInstance);
     return static_cast<int>(msg.wParam);
