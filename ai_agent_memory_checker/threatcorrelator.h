@@ -22,6 +22,24 @@ public:
         Critical
     };
 
+    std::string ThreatLevelToString(ThreatLevel level) {
+        if(level == ThreatLevel::Low)
+            return "Low";
+        else if (level == ThreatLevel::Medium)
+            return "Medium";
+        else if (level == ThreatLevel::High)
+            return "High";
+        else
+            return "Critical";
+    }
+
+    struct ThreatAlert {
+        std::string timestamp;
+        std::string category;
+        ThreatLevel level;
+        std::string details;
+    };
+
     struct ForensicEvent {
         std::string timestamp;
         std::string category; // "Registry", "Clipboard", "Network", "Injection", etc.
@@ -56,6 +74,25 @@ public:
         }
     }
 
+    std::string GenerateCorrelationReport() {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        std::ostringstream ss;
+
+        ss << "=== THREAT CORRELATION & AUDIT SUMMARY ===\r\n";
+        ss << "Cumulative Risk Score: " << m_cumulativeScore << "\r\n";
+        ss << "Total Intercepted Alerts: " << m_alerts.size() << "\r\n";
+        ss << "Threat Status: " << (m_cumulativeScore > 50 ? "[CRITICAL ALERT] Active Attack Kill-Chain Detected!" : "[STABLE] Normal Monitoring") << "\r\n\r\n";
+
+        ss << "--- Detailed Alert Timeline ---\r\n";
+        for (const auto& alert : m_alerts) {
+            ss << "[" << alert.timestamp << "] [" << alert.category << "] "
+               << "Severity: " << ThreatLevelToString(alert.level) << "\r\n"
+               << "  -> " << alert.details << "\r\n";
+        }
+
+        return ss.str();
+    }
+
     size_t GetTotalEventsCount() const {
         return m_eventStream.size();
     }
@@ -66,9 +103,13 @@ public:
     }
 
 private:
-    ThreatCorrelator() {}
+    ThreatCorrelator() : m_cumulativeScore(0) {}
 
     std::vector<ForensicEvent> m_eventStream;
+
+    std::vector<ThreatAlert> m_alerts;
+    std::mutex m_mutex;
+    int m_cumulativeScore;
 
     std::string GetCurrentTimestamp() {
         auto now = std::chrono::system_clock::now();
