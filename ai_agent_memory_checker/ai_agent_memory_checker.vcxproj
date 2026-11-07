@@ -181,6 +181,7 @@
     <ClInclude Include="threatcorrelator.h" />
     <ClInclude Include="timelinecorrelator.h" />
     <ClInclude Include="treeprocess.h" />
+    <ClInclude Include="YaraMatcher.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
