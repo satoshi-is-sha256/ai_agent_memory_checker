@@ -50,6 +50,7 @@
 #include "etwsessionmonitor.h"
 #include "handleaccessmonitor.h"
 #include "fileIodroppermonitor.h"
+#include "DllLoadMonitor.h"
 
 HWND g_hWnd = nullptr;
 HWND g_hEditProcessName = nullptr;
@@ -126,6 +127,9 @@ pfnOpenProcess CHandleAccessMonitor::Original_OpenProcess = nullptr;
 
 // fileIodroppermonitor.h
 pfnCreateFileW CFileIoDropperMonitor::Original_CreateFileW = nullptr;
+
+// DllLoadMonitor.h
+pfnLoadLibraryExW CDllLoadMonitor::Original_LoadLibraryExW = nullptr;
 
 static std::string RunDebuggerForensics(DWORD targetProcessId) {
     std::ostringstream stream;
@@ -1068,7 +1072,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.53",
+        L"AI Agent Memory Checker v1.54",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
@@ -1101,6 +1105,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CComObjectMonitor::InitializeComHooks();
     CHandleAccessMonitor::InitializeHandleAuditHooks();
     CFileIoDropperMonitor::InitializeFileIoHooks();
+    CDllLoadMonitor::InitializeDllLoadHooks();
 
     CTelemetryServer::GetInstance().Start();
 
@@ -1129,6 +1134,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CComObjectMonitor::UninitializeComHooks();
     CHandleAccessMonitor::UninitializeHandleAuditHooks();
     CFileIoDropperMonitor::UninitializeFileIoHooks();
+    CDllLoadMonitor::UninitializeDllLoadHooks();
 
     CTelemetryServer::GetInstance().Stop();
 
