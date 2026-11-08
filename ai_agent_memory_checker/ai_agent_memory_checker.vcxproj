@@ -151,6 +151,7 @@
     <ClInclude Include="DllLoadMonitor.h" />
     <ClInclude Include="dnsresolutionmonitor.h" />
     <ClInclude Include="dpapimonitor.h" />
+    <ClInclude Include="EtwKernelConsumer.h" />
     <ClInclude Include="etwsessionmonitor.h" />
     <ClInclude Include="filedrop.h" />
     <ClInclude Include="fileIodroppermonitor.h" />

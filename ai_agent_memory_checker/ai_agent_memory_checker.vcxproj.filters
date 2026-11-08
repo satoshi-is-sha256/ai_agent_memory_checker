@@ -194,5 +194,8 @@
     <ClInclude Include="HttpTrafficInspector.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="EtwKernelConsumer.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
