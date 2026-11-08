@@ -55,6 +55,7 @@
 #include "YaraMatcher.h"
 #include "resourcemonitor.h"
 #include "RegistryPersistenceMonitor.h"
+#include "HttpTrafficInspector.h"
 
 HWND g_hWnd = nullptr;
 HWND g_hEditProcessName = nullptr;
@@ -137,6 +138,9 @@ pfnLoadLibraryExW CDllLoadMonitor::Original_LoadLibraryExW = nullptr;
 
 // RegistryPersistenceMonitor.h
 pfnRegSetValueExW CRegistryPersistenceMonitor::Original_RegSetValueExW = nullptr;
+
+// HttpTrafficInspector.h
+pfnHttpSendRequestW CHttpTrafficInspector::Original_HttpSendRequestW = nullptr;
 
 static std::string RunDebuggerForensics(DWORD targetProcessId) {
     std::ostringstream stream;
@@ -1079,7 +1083,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.59",
+        L"AI Agent Memory Checker v1.60",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
@@ -1114,6 +1118,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CFileIoDropperMonitor::InitializeFileIoHooks();
     CDllLoadMonitor::InitializeDllLoadHooks();
     CRegistryPersistenceMonitor::InitializeRegistryPersistenceHooks();
+    CHttpTrafficInspector::InitializeHttpTrafficHooks();
 
     CTelemetryServer::GetInstance().Start();
 
@@ -1144,6 +1149,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CFileIoDropperMonitor::UninitializeFileIoHooks();
     CDllLoadMonitor::UninitializeDllLoadHooks();
     CRegistryPersistenceMonitor::UninitializeRegistryPersistenceHooks();
+    CHttpTrafficInspector::UninitializeHttpTrafficHooks();
 
     CTelemetryServer::GetInstance().Stop();
 
