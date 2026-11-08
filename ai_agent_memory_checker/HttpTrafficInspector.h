@@ -37,7 +37,8 @@ public:
             ss << "  -> Payload Size: " << dwOptionalLength << " bytes\r\n";
             ss << "  -> Data Snippet: " << payload.substr(0, 200) << (payload.size() > 200 ? "..." : "") << "\r\n";
 
-            // g_ThreatCorrelator.IngestEvent("HttpInspection", ThreatLevel::Medium, ss.str());
+            ThreatCorrelator::GetInstance().IngestEvent("HttpInspection", ss.str(), ThreatCorrelator::ThreatLevel::Medium);
+            g_NtAlpcCreatePortLogs += ss.str();
         }
 
         return Original_HttpSendRequestW(hRequest, lpszHeaders, dwHeadersLength, lpOptional, dwOptionalLength);

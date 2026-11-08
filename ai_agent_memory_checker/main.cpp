@@ -57,6 +57,7 @@
 #include "RegistryPersistenceMonitor.h"
 #include "HttpTrafficInspector.h"
 #include "EtwKernelConsumer.h"
+#include "NamedPipeMonitor.h"
 
 HWND g_hWnd = nullptr;
 HWND g_hEditProcessName = nullptr;
@@ -142,6 +143,10 @@ pfnRegSetValueExW CRegistryPersistenceMonitor::Original_RegSetValueExW = nullptr
 
 // HttpTrafficInspector.h
 pfnHttpSendRequestW CHttpTrafficInspector::Original_HttpSendRequestW = nullptr;
+
+// NamedPipeMonitor.h
+pfnCreateNamedPipeW CNamedPipeMonitor::Original_CreateNamedPipeW = nullptr;
+pfnConnectNamedPipe CNamedPipeMonitor::Original_ConnectNamedPipe = nullptr;
 
 static std::string RunDebuggerForensics(DWORD targetProcessId) {
     std::ostringstream stream;
@@ -1084,7 +1089,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.61",
+        L"AI Agent Memory Checker v1.62",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
@@ -1120,6 +1125,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CDllLoadMonitor::InitializeDllLoadHooks();
     CRegistryPersistenceMonitor::InitializeRegistryPersistenceHooks();
     CHttpTrafficInspector::InitializeHttpTrafficHooks();
+    CNamedPipeMonitor::InitializeNamedPipeHooks();
 
     CTelemetryServer::GetInstance().Start();
 
@@ -1151,6 +1157,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CDllLoadMonitor::UninitializeDllLoadHooks();
     CRegistryPersistenceMonitor::UninitializeRegistryPersistenceHooks();
     CHttpTrafficInspector::UninitializeHttpTrafficHooks();
+    CNamedPipeMonitor::UninitializeNamedPipeHooks();
 
     CTelemetryServer::GetInstance().Stop();
 
