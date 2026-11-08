@@ -188,5 +188,8 @@
     <ClInclude Include="resourcemonitor.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="RegistryPersistenceMonitor.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

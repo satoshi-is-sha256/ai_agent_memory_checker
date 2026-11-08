@@ -172,6 +172,7 @@
     <ClInclude Include="processuser.h" />
     <ClInclude Include="promptInspector.h" />
     <ClInclude Include="realtimechecking.h" />
+    <ClInclude Include="RegistryPersistenceMonitor.h" />
     <ClInclude Include="registrypersistencetracker.h" />
     <ClInclude Include="report.h" />
     <ClInclude Include="resourcemonitor.h" />
