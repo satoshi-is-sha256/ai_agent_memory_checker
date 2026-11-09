@@ -149,6 +149,7 @@
     <ClInclude Include="detours.h" />
     <ClInclude Include="diskio.h" />
     <ClInclude Include="DllLoadMonitor.h" />
+    <ClInclude Include="DllSideLoadingMonitor.h" />
     <ClInclude Include="dnsresolutionmonitor.h" />
     <ClInclude Include="dpapimonitor.h" />
     <ClInclude Include="EtwKernelConsumer.h" />
