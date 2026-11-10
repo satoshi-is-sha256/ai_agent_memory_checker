@@ -6,6 +6,7 @@
 #define PROMPTINSPECTOR
 
 #include "common.h"
+#pragma warning(disable: 4566)
 
 inline std::string InspectAiModelPayload(const std::string &payloadStr) {
     std::ostringstream aiLog;
@@ -32,5 +33,70 @@ inline std::string InspectAiModelPayload(const std::string &payloadStr) {
 
     return aiLog.str();
 }
+
+// Singleton
+class AiPromptShield {
+private:
+    AiPromptShield() {
+        InitializeSignatures();
+    }
+
+    std::vector<std::string> m_injectionSignatures;
+
+    void InitializeSignatures() {
+        m_injectionSignatures.push_back("ignore previous instructions");
+        m_injectionSignatures.push_back("system override");
+        m_injectionSignatures.push_back("disregard all prior rules");
+        m_injectionSignatures.push_back("reveal system prompt");
+        m_injectionSignatures.push_back("you are now DAN");
+    }
+
+public:
+    static AiPromptShield &GetInstance() {
+        static AiPromptShield aps;
+        return aps;
+    }
+
+    struct InspectionResult {
+        bool isMalicious;
+        std::string detectedSignature;
+        std::string riskDetails;
+    };
+
+    static char tolower(char c) {
+        return (char)std::tolower(c);
+    }
+
+    InspectionResult InspectPrompt(const std::string &promptText) {
+        InspectionResult result{false, "", ""};
+
+        std::string lowerText = promptText;
+        std::transform(lowerText.begin(), lowerText.end(), lowerText.begin(), AiPromptShield::tolower);
+
+        for (const auto& sig : m_injectionSignatures) {
+            if (lowerText.find(sig) != std::string::npos) {
+                result.isMalicious = true;
+                result.detectedSignature = sig;
+
+                std::ostringstream ss;
+                ss << "[AI-PROMPT-SHIELD] Prompt Injection / Jailbreak Attempt Detected!\r\n"
+                   << "  -> Matched Signature: \"" << sig << "\"\r\n"
+                   << "  -> Prompt Snippet: " << promptText.substr(0, 150) << (promptText.size() > 150 ? "..." : "") << "\r\n";
+                result.riskDetails = ss.str();
+                break;
+            }
+        }
+
+        if (!result.isMalicious) {
+            if (promptText.find("\u200B") != std::string::npos || promptText.find("\u200C") != std::string::npos) { // #pragma warning(disable: 4566)
+                result.isMalicious = true;
+                result.detectedSignature = "Hidden Zero-Width Injection";
+                result.riskDetails = "[AI-PROMPT-SHIELD] Zero-width control characters detected in prompt payload.\r\n";
+            }
+        }
+
+        return result;
+    }
+};
 
 #endif
