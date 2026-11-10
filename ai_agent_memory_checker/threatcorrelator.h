@@ -22,15 +22,21 @@ public:
         Critical
     };
 
+    struct ForensicEvent_mod {
+        std::string moduleSource;
+        ThreatLevel level;
+        std::string description;
+        std::string timestamp;
+    };
+
     std::string ThreatLevelToString(ThreatLevel level) {
-        if(level == ThreatLevel::Low)
-            return "Low";
-        else if (level == ThreatLevel::Medium)
-            return "Medium";
-        else if (level == ThreatLevel::High)
-            return "High";
-        else
-            return "Critical";
+        switch (level) {
+            case ThreatLevel::Low:      return "LOW";
+            case ThreatLevel::Medium:   return "MEDIUM";
+            case ThreatLevel::High:     return "HIGH";
+            case ThreatLevel::Critical: return "CRITICAL";
+            default:                    return "UNKNOWN";
+        }
     }
 
     struct ThreatAlert {
@@ -40,7 +46,7 @@ public:
         std::string details;
     };
 
-    struct ForensicEvent {
+    struct ForensicEvent : public ForensicEvent_mod {
         std::string timestamp;
         std::string category; // "Registry", "Clipboard", "Network", "Injection", etc.
         std::string details;
@@ -48,7 +54,33 @@ public:
         ForensicEvent() { baseThreat = ThreatLevel::Low; }
     };
 
-    void IngestEvent(const std::string& category, const std::string &details, ThreatLevel level) {
+    void TriggerKillChainAlert(const ForensicEvent &latest_event) {
+        std::ostringstream ss;
+        ss << ThreatLevelToString(latest_event.level) << " : " << latest_event.category << " : " << latest_event.description << "***\r\n";
+        g_NtAlpcCreatePortLogs += "[THREAT-CORRELATOR] *** CRITICAL KILL CHAIN ALERT DETECTED ***\r\n";
+        g_NtAlpcCreatePortLogs += ss.str();
+    }
+
+    void IngestEvent(const std::string &source, const std::string &desc, ThreatLevel level) {
+        std::lock_guard<std::mutex> lock(m_mutex);
+
+        ForensicEvent ev;
+        ev.moduleSource = source;
+        ev.level = level;
+        ev.description = desc;
+        ev.timestamp = GetCurrentTimestamp();
+
+        m_eventLog.push_back(ev);
+
+        int weight = static_cast<int>(level);
+        m_accumulatedScore += weight * 10;
+
+        if (m_accumulatedScore >= 50 || level == ThreatLevel::Critical) {
+            TriggerKillChainAlert(ev);
+        }
+    }
+
+    void IngestEvent2(const std::string& category, const std::string &details, ThreatLevel level) {
         ForensicEvent ev;
         ev.timestamp = GetCurrentTimestamp();
         ev.category = category;
@@ -110,6 +142,9 @@ private:
     std::vector<ThreatAlert> m_alerts;
     std::mutex m_mutex;
     int m_cumulativeScore;
+
+    std::vector<ForensicEvent> m_eventLog;
+    int m_accumulatedScore;
 
     std::string GetCurrentTimestamp() {
         auto now = std::chrono::system_clock::now();
