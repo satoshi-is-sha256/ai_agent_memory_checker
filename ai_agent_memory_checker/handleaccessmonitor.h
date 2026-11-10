@@ -37,18 +37,29 @@ public:
         return res.empty() ? "STANDARD_ACCESS" : res;
     }
 
+    static std::string AnalyzeAccessMask(DWORD dwDesiredAccess) {
+        std::string details = "";
+        if (dwDesiredAccess & PROCESS_ALL_ACCESS) details += "[PROCESS_ALL_ACCESS] ";
+        if (dwDesiredAccess & PROCESS_VM_WRITE) details += "[PROCESS_VM_WRITE (Memory Modification)] ";
+        if (dwDesiredAccess & PROCESS_VM_READ) details += "[PROCESS_VM_READ (Memory Read / Dumping)] ";
+        if (dwDesiredAccess & PROCESS_CREATE_THREAD) details += "[PROCESS_CREATE_THREAD (Remote Thread Injection)] ";
+        if (details.empty()) details = "[Standard / Restricted Access]";
+        return details;
+    }
+
     static HANDLE WINAPI Hooked_OpenProcess(
         DWORD dwDesiredAccess,
         BOOL bInheritHandle,
         DWORD dwProcessId
     ) {
         std::string accessRightsDesc = ParseProcessAccessRights(dwDesiredAccess);
+        std::string accessFlagsDesc = AnalyzeAccessMask(dwDesiredAccess);
 
         std::ostringstream ss;
         ss << "[HANDLE-AUDIT] Process Handle Acquisition Intercepted!\r\n";
         ss << "  -> Target PID: " << dwProcessId << "\r\n";
         ss << "  -> Requested Access Rights: 0x" << std::hex << dwDesiredAccess << std::dec
-           << " (" << accessRightsDesc << ")\r\n";
+           << " (" << accessRightsDesc << ")" << " (" << accessFlagsDesc << ")\r\n";
 
         if ((dwDesiredAccess & PROCESS_VM_WRITE) || (dwDesiredAccess & PROCESS_CREATE_THREAD)) {
             g_NtAlpcCreatePortLogs += "[SECURITY-ALERT] High-privilege cross-process handle request detected!\n";
