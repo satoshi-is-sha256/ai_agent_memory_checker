@@ -63,6 +63,13 @@ public:
         std::string riskDetails;
     };
 
+    struct ProcessParamInfo {
+        bool success;
+        std::string commandLine;
+        std::string imagePath;
+        std::string details;
+    };
+
     static char tolower(char c) {
         return (char)std::tolower(c);
     }
@@ -96,6 +103,58 @@ public:
         }
 
         return result;
+    }
+
+    ProcessParamInfo InspectProcessCommandLine(HANDLE hProcess) {
+        ProcessParamInfo info{ false, "", "", "" };
+
+        HMODULE hNtdll = GetModuleHandleW(L"ntdll.dll");
+        if (!hNtdll) return info;
+
+        auto NtQueryInformationProcess = (pfnNtQueryInformationProcess)GetProcAddress(hNtdll, "NtQueryInformationProcess");
+        if (!NtQueryInformationProcess) return info;
+
+        PROCESS_BASIC_INFORMATION pbi;
+        ULONG returnLength = 0;
+
+        NTSTATUS status = NtQueryInformationProcess(
+            hProcess,
+            ProcessBasicInformation,
+            &pbi,
+            sizeof(pbi),
+            &returnLength
+        );
+
+        if (NT_SUCCESS(status) && pbi.PebBaseAddress) {
+            PEB peb{};
+            SIZE_T bytesRead = 0;
+
+            if (ReadProcessMemory(hProcess, pbi.PebBaseAddress, &peb, sizeof(peb), &bytesRead)) {
+                RTL_USER_PROCESS_PARAMETERS procParams{};
+                if (ReadProcessMemory(hProcess, peb.ProcessParameters, &procParams, sizeof(procParams), &bytesRead)) {
+                    if (procParams.CommandLine.Buffer && procParams.CommandLine.Length > 0) {
+                        std::vector<WCHAR> cmdLineBuf(procParams.CommandLine.Length / sizeof(WCHAR) + 1, 0);
+                        if (ReadProcessMemory(hProcess, procParams.CommandLine.Buffer, cmdLineBuf.data(), procParams.CommandLine.Length, &bytesRead)) {
+                            std::wstring wCmd(cmdLineBuf.data());
+                            info.commandLine = WStringToString(wCmd);
+                            info.success = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (info.success) {
+            std::ostringstream oss;
+            oss << "[PROCESS-PARAM-AUDIT] CommandLine Extracted Successfully:\r\n"
+                << "  -> CommandLine: " << info.commandLine << "\r\n";
+            info.details = oss.str();
+        }
+        else {
+            info.details = "[PROCESS-PARAM-AUDIT] Failed to extract CommandLine from target PEB.\r\n";
+        }
+
+        return info;
     }
 };
 
