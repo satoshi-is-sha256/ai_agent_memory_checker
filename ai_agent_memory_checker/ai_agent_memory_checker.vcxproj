@@ -189,6 +189,7 @@
     <ClInclude Include="threatcorrelator.h" />
     <ClInclude Include="timelinecorrelator.h" />
     <ClInclude Include="treeprocess.h" />
+    <ClInclude Include="VirtualallocInjectionMonitor.h" />
     <ClInclude Include="YaraMatcher.h" />
     <ClInclude Include="YaraMemoryScanner.h" />
   </ItemGroup>
