@@ -64,6 +64,7 @@
 #include "DriverLoadMonitor.h"
 #include "VirtualallocInjectionMonitor.h"
 #include "RegistryRWMonitor.h"
+#include "TokenPrivilegeMonitor.h"
 
 HWND g_hWnd = nullptr;
 HWND g_hEditProcessName = nullptr;
@@ -171,6 +172,10 @@ pfnCreateRemoteThread CVirtualallocInjectionMonitor::Original_CreateRemoteThread
 // RegistryRWMonitor.h
 pfnRegCreateKeyExW CRegistryRWMonitor::Original_RegCreateKeyExW =nullptr;;
 pfnRegSetValueExW CRegistryRWMonitor::Original_RegSetValueExW = nullptr;
+
+// TokenPrivilegeMonitor.h
+pfnOpenProcessToken CTokenPrivilegeMonitor::Original_OpenProcessToken = nullptr;
+pfnAdjustTokenPrivileges CTokenPrivilegeMonitor::Original_AdjustTokenPrivileges = nullptr;
 
 static std::string RunDebuggerForensics(DWORD targetProcessId) {
     std::ostringstream stream;
@@ -1113,7 +1118,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.72",
+        L"AI Agent Memory Checker v1.73",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
@@ -1155,6 +1160,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CDriverLoadMonitor::InitializeDriverLoadHooks();
     CVirtualallocInjectionMonitor::InitializeProcessInjectionHooks();
     CRegistryRWMonitor::InitializeRegistryPersistenceHooks();
+    CTokenPrivilegeMonitor::InitializeTokenPrivilegeHooks();
 
     CTelemetryServer::GetInstance().Start();
 
@@ -1192,6 +1198,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CDriverLoadMonitor::UninitializeDriverLoadHooks();
     CVirtualallocInjectionMonitor::UninitializeProcessInjectionHooks();
     CRegistryRWMonitor::UninitializeRegistryPersistenceHooks();
+    CTokenPrivilegeMonitor::UninitializeTokenPrivilegeHooks();
 
     CTelemetryServer::GetInstance().Stop();
 

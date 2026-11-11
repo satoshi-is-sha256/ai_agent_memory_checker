@@ -33,7 +33,7 @@ public:
     }
 
     void ScanProcessMemory() {
-        HANDLE hProcess = GetCurrentProcess();
+        //HANDLE hProcess = GetCurrentProcess();
         SYSTEM_INFO sysInfo;
         GetSystemInfo(&sysInfo);
 
