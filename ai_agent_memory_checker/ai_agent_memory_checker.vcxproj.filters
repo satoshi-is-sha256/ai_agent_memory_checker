@@ -221,5 +221,8 @@
     <ClInclude Include="TokenPrivilegeMonitor.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="HookIntegrityMonitor.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

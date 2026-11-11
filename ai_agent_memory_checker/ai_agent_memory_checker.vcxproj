@@ -162,6 +162,7 @@
     <ClInclude Include="forensicselftest.h" />
     <ClInclude Include="globalhookmonitor.h" />
     <ClInclude Include="handleaccessmonitor.h" />
+    <ClInclude Include="HookIntegrityMonitor.h" />
     <ClInclude Include="HttpTrafficInspector.h" />
     <ClInclude Include="logs.h" />
     <ClInclude Include="memorychecker.h" />
