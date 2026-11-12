@@ -67,6 +67,7 @@
 #include "TokenPrivilegeMonitor.h"
 #include "HookIntegrityMonitor.h"
 #include "EvtClearLog.h"
+#include "LsassProtectionAudit.h"
 
 HWND g_hWnd = nullptr;
 HWND g_hEditProcessName = nullptr;
@@ -182,6 +183,10 @@ pfnAdjustTokenPrivileges CTokenPrivilegeMonitor::Original_AdjustTokenPrivileges 
 // EvtClearLog.h
 pfnEvtClearLog CEventLogAudit::Original_EvtClearLog = nullptr;
 pfnClearEventLogW CEventLogAudit::Original_ClearEventLogW = nullptr;
+
+// LsassProtectionAudit.h
+pfnMiniDumpWriteDump CLsassProtectionAudit::Original_MiniDumpWriteDump = nullptr;
+DWORD CLsassProtectionAudit::g_TargetLsassPid = 0;
 
 static std::string RunDebuggerForensics(DWORD targetProcessId) {
     std::ostringstream stream;
@@ -1124,7 +1129,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.76",
+        L"AI Agent Memory Checker v1.77",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
@@ -1168,6 +1173,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CRegistryRWMonitor::InitializeRegistryPersistenceHooks();
     CTokenPrivilegeMonitor::InitializeTokenPrivilegeHooks();
     CEventLogAudit::InitializeEventLogAuditHooks();
+    CLsassProtectionAudit::InitializeLsassProtectionHooks();
 
     CTelemetryServer::GetInstance().Start();
 
@@ -1207,6 +1213,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CRegistryRWMonitor::UninitializeRegistryPersistenceHooks();
     CTokenPrivilegeMonitor::UninitializeTokenPrivilegeHooks();
     CEventLogAudit::UninitializeEventLogAuditHooks();
+    CLsassProtectionAudit::UninitializeLsassProtectionHooks();
 
     CTelemetryServer::GetInstance().Stop();
 

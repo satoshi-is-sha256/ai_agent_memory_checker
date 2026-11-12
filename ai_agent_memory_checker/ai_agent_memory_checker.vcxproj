@@ -166,6 +166,7 @@
     <ClInclude Include="HookIntegrityMonitor.h" />
     <ClInclude Include="HttpTrafficInspector.h" />
     <ClInclude Include="logs.h" />
+    <ClInclude Include="LsassProtectionAudit.h" />
     <ClInclude Include="memorychecker.h" />
     <ClInclude Include="memorydetector.h" />
     <ClInclude Include="memoryscanner.h" />
