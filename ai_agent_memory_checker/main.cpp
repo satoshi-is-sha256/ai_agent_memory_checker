@@ -66,6 +66,7 @@
 #include "RegistryRWMonitor.h"
 #include "TokenPrivilegeMonitor.h"
 #include "HookIntegrityMonitor.h"
+#include "EvtClearLog.h"
 
 HWND g_hWnd = nullptr;
 HWND g_hEditProcessName = nullptr;
@@ -177,6 +178,10 @@ pfnRegSetValueExW CRegistryRWMonitor::Original_RegSetValueExW = nullptr;
 // TokenPrivilegeMonitor.h
 pfnOpenProcessToken CTokenPrivilegeMonitor::Original_OpenProcessToken = nullptr;
 pfnAdjustTokenPrivileges CTokenPrivilegeMonitor::Original_AdjustTokenPrivileges = nullptr;
+
+// EvtClearLog.h
+pfnEvtClearLog CEventLogAudit::Original_EvtClearLog = nullptr;
+pfnClearEventLogW CEventLogAudit::Original_ClearEventLogW = nullptr;
 
 static std::string RunDebuggerForensics(DWORD targetProcessId) {
     std::ostringstream stream;
@@ -1119,7 +1124,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.75",
+        L"AI Agent Memory Checker v1.76",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
@@ -1162,6 +1167,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CVirtualallocInjectionMonitor::InitializeProcessInjectionHooks();
     CRegistryRWMonitor::InitializeRegistryPersistenceHooks();
     CTokenPrivilegeMonitor::InitializeTokenPrivilegeHooks();
+    CEventLogAudit::InitializeEventLogAuditHooks();
 
     CTelemetryServer::GetInstance().Start();
 
@@ -1200,6 +1206,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CVirtualallocInjectionMonitor::UninitializeProcessInjectionHooks();
     CRegistryRWMonitor::UninitializeRegistryPersistenceHooks();
     CTokenPrivilegeMonitor::UninitializeTokenPrivilegeHooks();
+    CEventLogAudit::UninitializeEventLogAuditHooks();
 
     CTelemetryServer::GetInstance().Stop();
 

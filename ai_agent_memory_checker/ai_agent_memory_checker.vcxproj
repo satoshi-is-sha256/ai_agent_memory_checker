@@ -156,6 +156,7 @@
     <ClInclude Include="DriverLoadMonitor.h" />
     <ClInclude Include="EtwKernelConsumer.h" />
     <ClInclude Include="etwsessionmonitor.h" />
+    <ClInclude Include="EvtClearLog.h" />
     <ClInclude Include="filedrop.h" />
     <ClInclude Include="fileIodroppermonitor.h" />
     <ClInclude Include="forensicauditlogger.h" />
