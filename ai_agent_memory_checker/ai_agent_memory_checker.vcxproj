@@ -146,6 +146,7 @@
     <ClInclude Include="commonmemorymapping.h" />
     <ClInclude Include="comobjectmonitor.h" />
     <ClInclude Include="crashdumphandler.h" />
+    <ClInclude Include="CryptoPathAudit.h" />
     <ClInclude Include="debugger.h" />
     <ClInclude Include="detours.h" />
     <ClInclude Include="diskio.h" />

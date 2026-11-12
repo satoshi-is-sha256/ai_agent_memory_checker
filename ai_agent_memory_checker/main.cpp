@@ -69,6 +69,7 @@
 #include "EvtClearLog.h"
 #include "LsassProtectionAudit.h"
 #include "DnsQuery_W.h"
+#include "CryptoPathAudit.h"
 
 HWND g_hWnd = nullptr;
 HWND g_hEditProcessName = nullptr;
@@ -192,6 +193,11 @@ DWORD CLsassProtectionAudit::g_TargetLsassPid = 0;
 //DnsQuery_W.h
 pfnGetAddrInfoW CDnsQueryAudit::Original_GetAddrInfoW = nullptr;
 pfnDnsQuery_W CDnsQueryAudit::Original_DnsQuery_W = nullptr;
+
+// CryptoPathAudit.h
+PFN_SEND CCryptoPathAudit::Real_send = nullptr;
+PFN_WSASEND CCryptoPathAudit::Real_WSASend = nullptr;
+PFN_HTTPSENDREQUESTW CCryptoPathAudit::Real_HttpSendRequestW = nullptr;
 
 static std::string RunDebuggerForensics(DWORD targetProcessId) {
     std::ostringstream stream;
@@ -1134,7 +1140,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.79",
+        L"AI Agent Memory Checker v1.80",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
@@ -1180,6 +1186,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CEventLogAudit::InitializeEventLogAuditHooks();
     CLsassProtectionAudit::InitializeLsassProtectionHooks();
     CDnsQueryAudit::InitializeDnsQueryAuditHooks();
+    CCryptoPathAudit::InitializeCryptoPathAudit();
 
     CTelemetryServer::GetInstance().Start();
 
@@ -1221,6 +1228,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CEventLogAudit::UninitializeEventLogAuditHooks();
     CLsassProtectionAudit::UninitializeLsassProtectionHooks();
     CDnsQueryAudit::UninitializeDnsQueryAuditHooks();
+    CCryptoPathAudit::UninitializeCryptoPathAudit();
 
     CTelemetryServer::GetInstance().Stop();
 
