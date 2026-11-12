@@ -36,7 +36,8 @@ public:
             case WH_CALLWNDPROCRET:  return "WH_CALLWNDPROCRET";
             case WH_KEYBOARD_LL:     return "WH_KEYBOARD_LL (Low-Level Keyboard Hook)";
             case WH_MOUSE_LL:        return "WH_MOUSE_LL (Low-Level Mouse Hook)";
-            default:                 return "UNKNOWN_HOOK_TYPE";
+            //default:                 return "UNKNOWN_HOOK_TYPE";
+            default:                 return "Other Hook Type (" + std::to_string(idHook) + ")";
         }
     }
 
@@ -49,7 +50,9 @@ public:
         ss << "  -> Target Thread ID: " << dwThreadId << " (0 means Global System-wide)\r\n";
 
         if (idHook == WH_KEYBOARD_LL || idHook == WH_MOUSE_LL || dwThreadId == 0) {
-            // OutputDebugStringW(L"[SECURITY] High-risk global input sniffing attempt detected!\n");
+            std::ostringstream ss2;
+            ss2 << "[SECURITY] High-risk global input sniffing attempt detected! [" << hookName << "]\r\n";
+            g_NtAlpcCreatePortLogs += ss2.str();
         }
 
         ThreatCorrelator::GetInstance().IngestEvent("GlobalHook", ss.str(), ThreatCorrelator::ThreatLevel::High);
