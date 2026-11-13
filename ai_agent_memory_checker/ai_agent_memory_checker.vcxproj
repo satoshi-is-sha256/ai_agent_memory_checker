@@ -179,6 +179,7 @@
     <ClInclude Include="networkconnectionmapper.h" />
     <ClInclude Include="PebInspector.h" />
     <ClInclude Include="portscan.h" />
+    <ClInclude Include="ProcessExecutionAudit.h" />
     <ClInclude Include="ProcessInjectionMonitor.h" />
     <ClInclude Include="processtree.h" />
     <ClInclude Include="processuser.h" />

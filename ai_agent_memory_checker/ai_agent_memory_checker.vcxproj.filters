@@ -239,5 +239,8 @@
     <ClInclude Include="LocalLlmAudit.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="ProcessExecutionAudit.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
