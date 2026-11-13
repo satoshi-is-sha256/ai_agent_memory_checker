@@ -26,10 +26,16 @@ typedef BOOL(WINAPI *pfnConnectNamedPipe)(
     LPOVERLAPPED lpOverlapped
     );
 
+typedef BOOL(WINAPI *PFN_WRITEFILE)(
+    HANDLE hFile, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite,
+    LPDWORD lpNumberOfBytesWritten, LPOVERLAPPED lpOverlapped
+    );
+
 class CNamedPipeMonitor {
 public:
     static pfnCreateNamedPipeW Original_CreateNamedPipeW;
     static pfnConnectNamedPipe Original_ConnectNamedPipe;
+    static PFN_WRITEFILE Real_WriteFile;
 
     static HANDLE WINAPI Hooked_CreateNamedPipeW(
         LPCWSTR lpName,
@@ -52,6 +58,13 @@ public:
         ThreatCorrelator::GetInstance().IngestEvent("NamedPipe", ss.str(), ThreatCorrelator::ThreatLevel::Medium);
         g_NtAlpcCreatePortLogs += ss.str();
 
+        if (IsElectronOrMojoPipe(lpName)) {
+            std::ostringstream ss2;
+            ss2 << "[MojoIPC Audit] Target IPC Pipe Created: " << utf8PipeName << "\r\n";
+            ThreatCorrelator::GetInstance().IngestEvent("MojoIPC Audit Pipe Created", ss.str(), ThreatCorrelator::ThreatLevel::Medium);
+            g_NtAlpcCreatePortLogs += ss.str();
+        }
+
         return Original_CreateNamedPipeW(lpName, dwOpenMode, dwPipeMode, nMaxInstances, nOutBufferSize, nInBufferSize, nDefaultTimeOut, lpSecurityAttributes);
     }
 
@@ -67,12 +80,43 @@ public:
         return Original_ConnectNamedPipe(hNamedPipe, lpOverlapped);
     }
 
+    static BOOL WINAPI Hooked_WriteFile(
+        HANDLE hFile, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite,
+        LPDWORD lpNumberOfBytesWritten, LPOVERLAPPED lpOverlapped
+    ) {
+        if (hFile != INVALID_HANDLE_VALUE && lpBuffer != nullptr && nNumberOfBytesToWrite > 0) {
+            InspectIpcPayload(reinterpret_cast<const unsigned char*>(lpBuffer), static_cast<size_t>(nNumberOfBytesToWrite), L"OUTBOUND (Write)");
+        }
+
+        return Real_WriteFile(hFile, lpBuffer, nNumberOfBytesToWrite, lpNumberOfBytesWritten, lpOverlapped);
+    }
+
+    static bool IsElectronOrMojoPipe(LPCWSTR pipeName) {
+        if (pipeName == nullptr) return false;
+        if (wcsstr(pipeName, L"mojo") != nullptr ||
+            wcsstr(pipeName, L"electron") != nullptr ||
+            wcsstr(pipeName, L"chrome") != nullptr) {
+            return true;
+        }
+        return false;
+    }
+
+    static void InspectIpcPayload(const unsigned char *data, size_t size, const wchar_t *direction) {
+        if (size == 0 || data == nullptr) return;
+
+        std::ostringstream ss;
+        ss << "[MojoIPC Audit] Direction: " << WStringToString(std::wstring(direction)) << " Payload Size: " << size << "\r\n";
+        ThreatCorrelator::GetInstance().IngestEvent("MojoIPC Audit Payload", ss.str(), ThreatCorrelator::ThreatLevel::Medium);
+        g_NtAlpcCreatePortLogs += ss.str();
+    }
+
     static void InitializeNamedPipeHooks() {
         HMODULE hKernel32 = GetModuleHandleW(L"kernel32.dll");
         if (!hKernel32) return;
 
         Original_CreateNamedPipeW = (pfnCreateNamedPipeW)GetProcAddress(hKernel32, "CreateNamedPipeW");
         Original_ConnectNamedPipe = (pfnConnectNamedPipe)GetProcAddress(hKernel32, "ConnectNamedPipe");
+        Real_WriteFile = WriteFile;
 
         DetourTransactionBegin();
         DetourUpdateThread(GetCurrentThread());

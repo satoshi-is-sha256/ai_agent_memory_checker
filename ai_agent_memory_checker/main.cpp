@@ -160,6 +160,7 @@ pfnHttpSendRequestW CHttpTrafficInspector::Original_HttpSendRequestW = nullptr;
 // NamedPipeMonitor.h
 pfnCreateNamedPipeW CNamedPipeMonitor::Original_CreateNamedPipeW = nullptr;
 pfnConnectNamedPipe CNamedPipeMonitor::Original_ConnectNamedPipe = nullptr;
+PFN_WRITEFILE CNamedPipeMonitor::Real_WriteFile = nullptr;
 
 // DllSideLoadingMonitor.h
 pfnLdrLoadDll CDllSideLoadingMonitor::Original_LdrLoadDll = nullptr;
@@ -1140,7 +1141,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.80",
+        L"AI Agent Memory Checker v1.81",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
