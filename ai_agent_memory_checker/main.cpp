@@ -70,6 +70,7 @@
 #include "LsassProtectionAudit.h"
 #include "DnsQuery_W.h"
 #include "CryptoPathAudit.h"
+#include "LocalLlmAudit.h"
 
 HWND g_hWnd = nullptr;
 HWND g_hEditProcessName = nullptr;
@@ -199,6 +200,13 @@ pfnDnsQuery_W CDnsQueryAudit::Original_DnsQuery_W = nullptr;
 PFN_SEND CCryptoPathAudit::Real_send = nullptr;
 PFN_WSASEND CCryptoPathAudit::Real_WSASend = nullptr;
 PFN_HTTPSENDREQUESTW CCryptoPathAudit::Real_HttpSendRequestW = nullptr;
+
+// LocalLlmAudit.h
+std::unordered_set<SOCKET> CLocalLlmAudit::g_AiSockets;
+std::mutex CLocalLlmAudit::g_SocketMutex;
+const std::unordered_set<USHORT> CLocalLlmAudit::kAiSidecarPorts = { 11434, 8080, 1234, 5000 };
+PFN_CONNECT CLocalLlmAudit::Real_connect = nullptr;
+PFN_SEND CLocalLlmAudit::Real_send = nullptr;
 
 static std::string RunDebuggerForensics(DWORD targetProcessId) {
     std::ostringstream stream;
@@ -1141,7 +1149,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.81",
+        L"AI Agent Memory Checker v1.82",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
@@ -1188,6 +1196,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CLsassProtectionAudit::InitializeLsassProtectionHooks();
     CDnsQueryAudit::InitializeDnsQueryAuditHooks();
     CCryptoPathAudit::InitializeCryptoPathAudit();
+    CLocalLlmAudit::InitializeLocalLlmAudit();
 
     CTelemetryServer::GetInstance().Start();
 
@@ -1230,6 +1239,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CLsassProtectionAudit::UninitializeLsassProtectionHooks();
     CDnsQueryAudit::UninitializeDnsQueryAuditHooks();
     CCryptoPathAudit::UninitializeCryptoPathAudit();
+    CLocalLlmAudit::UninitializeLocalLlmAudit();
 
     CTelemetryServer::GetInstance().Stop();
 
