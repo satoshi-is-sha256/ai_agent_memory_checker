@@ -166,6 +166,7 @@ PFN_WRITEFILE CNamedPipeMonitor::Real_WriteFile = nullptr;
 
 // DllSideLoadingMonitor.h
 pfnLdrLoadDll CDllSideLoadingMonitor::Original_LdrLoadDll = nullptr;
+PFN_LOADLIBRARYEXW CDllSideLoadingMonitor::Real_LoadLibraryExW = nullptr;
 
 // AmsiMonitor.h
 pfnAmsiScanBuffer CAmsiMonitor::Original_AmsiScanBuffer = nullptr;
@@ -1154,7 +1155,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.83",
+        L"AI Agent Memory Checker v1.84",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
