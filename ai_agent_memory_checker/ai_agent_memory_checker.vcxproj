@@ -172,6 +172,7 @@
     <ClInclude Include="LsassProtectionAudit.h" />
     <ClInclude Include="memorychecker.h" />
     <ClInclude Include="memorydetector.h" />
+    <ClInclude Include="MemoryInjectionAudit.h" />
     <ClInclude Include="memoryscanner.h" />
     <ClInclude Include="mojopayloadparser.h" />
     <ClInclude Include="NamedPipeMonitor.h" />

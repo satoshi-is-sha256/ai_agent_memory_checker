@@ -242,5 +242,8 @@
     <ClInclude Include="ProcessExecutionAudit.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="MemoryInjectionAudit.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

@@ -72,6 +72,7 @@
 #include "CryptoPathAudit.h"
 #include "LocalLlmAudit.h"
 #include "ProcessExecutionAudit.h"
+#include "MemoryInjectionAudit.h"
 
 HWND g_hWnd = nullptr;
 HWND g_hEditProcessName = nullptr;
@@ -213,6 +214,11 @@ PFN_SEND CLocalLlmAudit::Real_send = nullptr;
 // ProcessExecutionAudit.h
 PFN_NTCREATEUSERPROCESS CProcessExecutionAudit::Real_NtCreateUserProcess = nullptr;
 PFN_CREATEPROCESSW CProcessExecutionAudit::Real_CreateProcessW = CreateProcessW;
+
+// MemoryInjectionAudit.h
+PFN_VIRTUALALLOCEX CMemoryInjectionAudit::Real_VirtualAllocEx = nullptr;
+PFN_VIRTUALPROTECTEX CMemoryInjectionAudit::Real_VirtualProtectEx = nullptr;
+PFN_CREATEREMOTETHREAD CMemoryInjectionAudit::Real_CreateRemoteThread = nullptr;
 
 static std::string RunDebuggerForensics(DWORD targetProcessId) {
     std::ostringstream stream;
@@ -1155,7 +1161,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.84",
+        L"AI Agent Memory Checker v1.85",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
@@ -1204,6 +1210,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CCryptoPathAudit::InitializeCryptoPathAudit();
     CLocalLlmAudit::InitializeLocalLlmAudit();
     CProcessExecutionAudit::InitializeProcessExecutionAudit();
+    CMemoryInjectionAudit::InitializeMemoryInjectionAudit();
 
     CTelemetryServer::GetInstance().Start();
 
@@ -1248,6 +1255,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CCryptoPathAudit::UninitializeCryptoPathAudit();
     CLocalLlmAudit::UninitializeLocalLlmAudit();
     CProcessExecutionAudit::UninitializProcessExecutionAudit();
+    CMemoryInjectionAudit::UninitializeMemoryInjectionAudit();
 
     CTelemetryServer::GetInstance().Stop();
 
