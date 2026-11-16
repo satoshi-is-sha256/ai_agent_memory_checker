@@ -554,6 +554,7 @@ static std::string ScanSystemMemoryAccess() {
 static void PipeServerThread() {
     bool fLogLeft = true;
     bool fLogRight = true;
+
     while (g_thread) {
         /**
         try {
@@ -630,6 +631,7 @@ static void PipeServerThread() {
         catch (const std::string&) {}
         **/
 
+/**
         try {
 
             if (fLogLeft) {
@@ -732,15 +734,10 @@ static void PipeServerThread() {
 
             logs_counter = 0;
         }
-
-        /**
-        * The following code is no longer needed because AI security investigations via DLL injection were blocked on October 16, 2026 (GPT-6 Astra).
-        * Therefore, we will continue from here.
-        * In the future, we will split this into a separate thread and restart it then (though it will probably still be blocked).
-        **/
-        Sleep(1000);
-        continue;
-
+**/
+        //
+        // DLL Injection
+        //
         HANDLE hPipe = CreateNamedPipeW(
             GUARDIAN_PIPE_NAME,
             PIPE_ACCESS_INBOUND,
@@ -750,12 +747,10 @@ static void PipeServerThread() {
             sizeof(GuardianAlertEvent),
             0, nullptr
         );
-
         if (hPipe == INVALID_HANDLE_VALUE) {
             Sleep(1000);
             continue;
         }
-
         if (ConnectNamedPipe(hPipe, nullptr) || GetLastError() == ERROR_PIPE_CONNECTED) {
             GuardianAlertEvent alert;
             DWORD bytesRead = 0;
@@ -766,7 +761,7 @@ static void PipeServerThread() {
 
                 std::wostringstream ss;
                 ss << L"[" << std::setfill(L'0') << std::setw(2) << st.wHour << L":"
-                    << std::setw(2) << st.wMinute << L":" << std::setw(2) << st.wSecond << L"] ";
+                   << std::setw(2) << st.wMinute << L":" << std::setw(2) << st.wSecond << L"] ";
 
                 wchar_t procNameBuf[256] = { 0 };
                 GetWindowTextW(g_hEditProcessName, procNameBuf, 256);
@@ -992,12 +987,12 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
         SendMessageW(hLogEditLeft, EM_SETCHARFORMAT, SCF_ALL, (LPARAM)&cf);
         SendMessageW(hLogEditRight, EM_SETCHARFORMAT, SCF_ALL, (LPARAM)&cf);
 
-        AppendLogText(hLogEditLeft, L"[AI Agent Memory Checker] Initialization completed.\n", RGB(100, 200, 250));
-        AppendLogText(hLogEditLeft, L"[System] Ready for Windows 11 (x64) process monitoring.\n\n", RGB(150, 150, 150));
+        AppendLogText(hLogEditLeft, L"[OK] Initialization completed.\n", RGB(100, 200, 250));
+        AppendLogText(hLogEditLeft, L"[OK] Ready, AI Agent Memory Checker monitoring.\n\n", RGB(150, 150, 150));
 
         g_thread = true;
         std::thread(PipeServerThread).detach();
-        AppendLogText(hLogEditLeft, L"[AI Agent Memory Checker] IPC Pipe listener initialized.\n\n", RGB(100, 200, 250));
+        AppendLogText(hLogEditLeft, L"[OK] PipeServerThread listener initialized.\n\n", RGB(100, 200, 250));
         break;
     }
 
@@ -1022,7 +1017,7 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
             GetWindowTextW(g_hEditProcessName, procNameBuf, 256);
 
             if (wcslen(procNameBuf) == 0) {
-                MessageBoxW(hWnd, L"Please enter a target process name (e.g. ChatGPT.exe).", L"Error", MB_OK | MB_ICONERROR);
+                MessageBoxW(hWnd, L"Please enter a target process name.", L"Error", MB_OK | MB_ICONERROR);
                 break;
             }
 
@@ -1067,7 +1062,7 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
             GetWindowTextA(g_hEditProcessName, procNameBuf, 256);
 
             if (strlen(procNameBuf) == 0) {
-                MessageBoxW(hWnd, L"Please enter a target process name (e.g. ChatGPT.exe).", L"Error", MB_OK | MB_ICONERROR);
+                MessageBoxW(hWnd, L"Please enter a target process name.", L"Error", MB_OK | MB_ICONERROR);
                 break;
             }
 
@@ -1162,7 +1157,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.86",
+        L"AI Agent Memory Checker v1.86 - 1",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
@@ -1176,6 +1171,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     ShowWindow(g_hWnd, nCmdShow);
     UpdateWindow(g_hWnd);
 
+/**
     InitializeAlpcHooks();
     CCommonMemory::InitializeSectionHooks();
     CALPCBACK::InitializeNamedPipeHooks();
@@ -1214,6 +1210,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CMemoryInjectionAudit::InitializeMemoryInjectionAudit();
 
     CTelemetryServer::GetInstance().Start();
+**/
 
     MSG msg;
     while (GetMessageW(&msg, nullptr, 0, 0)) {
@@ -1221,6 +1218,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
         DispatchMessageW(&msg);
     }
 
+/**
     UninitializeAlpcHooks();
     CCommonMemory::UninitializeSectionHooks();
     CALPCBACK::UninitializeNamedPipeHooks();
@@ -1259,6 +1257,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CMemoryInjectionAudit::UninitializeMemoryInjectionAudit();
 
     CTelemetryServer::GetInstance().Stop();
+**/
 
     UnregisterClassW(wc.lpszClassName, wc.hInstance);
     return static_cast<int>(msg.wParam);
