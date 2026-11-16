@@ -161,6 +161,7 @@
     <ClInclude Include="EvtClearLog.h" />
     <ClInclude Include="filedrop.h" />
     <ClInclude Include="fileIodroppermonitor.h" />
+    <ClInclude Include="ForensicAuditLog.h" />
     <ClInclude Include="forensicauditlogger.h" />
     <ClInclude Include="forensicselftest.h" />
     <ClInclude Include="globalhookmonitor.h" />
