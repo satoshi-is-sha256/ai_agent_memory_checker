@@ -343,6 +343,7 @@ static std::string ProcessScanResults(const std::vector<HandleAccessRecord> &cur
     );
 
     std::stringstream ss;
+    ss << "[*] Starting ProcessScanResults." << std::endl;
     for (const auto &record : newlyAdded) {
         std::string timestamp = GetCurrentTimestamp();
         std::string sourceName = GetProcessNameFromPID2(record.sourcePid);
@@ -364,22 +365,23 @@ static std::string MemoryDetector(HWND hWnd, const std::vector<HandleAccessRecor
     static bool g_isFirstScan = true;
 
     std::ostringstream ss;
-    ss << "[*] Starting MemoryDetector." << std::endl;
+    ss << "[*] Starting MemoryDetector, counter: " << currentScan.size() << std::endl;
 
     std::set<HandleAccessRecord> currentHandles(currentScan.begin(), currentScan.end());
     if (g_isFirstScan) {
         g_previousHandles = currentHandles;
         g_isFirstScan = false;
+        ss << "[OK] Starting MemoryDetector, First: skip" << std::endl;
         return ss.str();
     }
 
     std::set<HandleAccessRecord> newlyAdded;
-
     std::set_difference(
         currentHandles.begin(), currentHandles.end(),
         g_previousHandles.begin(), g_previousHandles.end(),
         std::inserter(newlyAdded, newlyAdded.end())
     );
+    ss << "[OK] Starting MemoryDetector, set_difference" << std::endl;
 
     DWORD userSpecifiedPid = GetDlgItemInt(hWnd, IDC_PID_INPUT, nullptr, FALSE);
     char process[MAX_PATH];
@@ -391,31 +393,29 @@ static std::string MemoryDetector(HWND hWnd, const std::vector<HandleAccessRecor
         std::string targetName = GetProcessNameFromPID2(record.targetPid);
         std::string sourcePath = GetProcessFullPath(record.sourcePid);
 
-        if (!IsTargetWatched(record.targetPid, userSpecifiedPid, targetName, userSpecifiedName)) {
-            continue;
-        }
+        if (IsTargetWatched(record.targetPid, userSpecifiedPid, targetName, userSpecifiedName)) {
+            bool canRead = (record.accessRights & PROCESS_VM_READ) != 0;
+            bool canWrite = (record.accessRights & PROCESS_VM_WRITE) != 0;
+            bool canCreateThread = (record.accessRights & PROCESS_CREATE_THREAD) != 0;
 
-        bool canRead = (record.accessRights & PROCESS_VM_READ) != 0;
-        bool canWrite = (record.accessRights & PROCESS_VM_WRITE) != 0;
-        bool canCreateThread = (record.accessRights & PROCESS_CREATE_THREAD) != 0;
-
-        if (canRead || canWrite || canCreateThread) {
-            ss << "[!] [TARGET MEMORY ACCESS DETECTED]" << std::endl;
-            ss << "    -> Target: PID " << record.targetPid << " (" << targetName << ")" << std::endl;
-            ss << "    -> Sleuth: PID " << record.sourcePid << " (" << sourceName << ")" << std::endl;
-            ss << "    -> Path:   " << sourcePath << std::endl;
-            ss << "    -> Rights: 0x" << std::hex << record.accessRights << std::dec;
+            if (canRead || canWrite || canCreateThread) {
+                ss << "[!] [TARGET MEMORY ACCESS DETECTED]" << std::endl;
+                ss << "    -> Target: PID " << record.targetPid << " (" << targetName << ")" << std::endl;
+                ss << "    -> Sleuth: PID " << record.sourcePid << " (" << sourceName << ")" << std::endl;
+                ss << "    -> Path:   " << sourcePath << std::endl;
+                ss << "    -> Rights: 0x" << std::hex << record.accessRights << std::dec;
         
-            if (canRead) ss << " [VM_READ (Memory Sucking?)]";
-            if (canWrite) ss << " [VM_WRITE]";
-            ss << std::endl << "--------------------------------------------------" << std::endl;
+                if (canRead) ss << " [VM_READ (Memory Sucking?)]";
+                if (canWrite) ss << " [VM_WRITE]";
+                ss << std::endl << "--------------------------------------------------" << std::endl;
+            }
         }
     }
 
     return ss.str();
 }
 
-static std::string ScanSystemMemoryAccess() {
+static std::string ScanSystemMemoryAccess(std::vector<HandleAccessRecord> &har) {
     std::ostringstream ss;
     ss << "[*] Starting ScanSystemMemoryAccess." << std::endl;
     HMODULE hNtdll = GetModuleHandleW(L"ntdll.dll");
@@ -447,6 +447,7 @@ static std::string ScanSystemMemoryAccess() {
     ss << "[+] Total system handles to inspect: " << handleInfo->NumberOfHandles << std::endl;
 
     std::vector<HandleAccessRecord> currentScan;
+    currentScan.reserve(10000);
     const int limiter = 30;
     int counter = 0;
     for (ULONG i = 0; i < handleInfo->NumberOfHandles; ++i) {
@@ -513,7 +514,6 @@ static std::string ScanSystemMemoryAccess() {
                     }
                 }
 
-                /***
                 if ((grantedAccess & PROCESS_VM_READ) || (grantedAccess & 0x1F0FFF)) {
                     HANDLE hLocalDuplicate = nullptr;
                     if (DuplicateHandle(hTargetProcess, hRemoteHandle, GetCurrentProcess(), &hLocalDuplicate, 0, FALSE, DUPLICATE_SAME_ACCESS)) {
@@ -537,36 +537,58 @@ static std::string ScanSystemMemoryAccess() {
                         }
                     }
                 }
-                ***/
             }
         }
 
         CloseHandle(hTargetProcess);
     }
 
-    ss << ProcessScanResults(currentScan);
-    ss << MemoryDetector(g_hWnd, currentScan);
+    har = std::move(currentScan);
 
     VirtualFree(buffer, 0, MEM_RELEASE);
     return ss.str();
+}
+
+void LogEntry_L(const std::string &logStr, COLORREF logColor = RGB(255, 180, 0)) {
+    char *pText = new char[logStr.size() + 1];
+    strcpy_s(pText, logStr.size() + 1, logStr.c_str());
+
+    PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY_LEFT_A, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
+}
+
+void LogEntry_R(const std::string &logStr, COLORREF logColor = RGB(255, 180, 0)) {
+    char *pText = new char[logStr.size() + 1];
+    strcpy_s(pText, logStr.size() + 1, logStr.c_str());
+
+    PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY_RIGHT_A, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
 }
 
 static void PipeServerThread() {
     bool fLogLeft = true;
     bool fLogRight = true;
 
+    int32_t counter = 0;
     while (g_thread) {
-        /**
         try {
-            COLORREF logColor = RGB(255, 180, 0);
-            std::string logStr = ScanSystemMemoryAccess();
-            char* pText = new char[logStr.size() + 1];
-            strcpy_s(pText, logStr.size() + 1, logStr.c_str());
-
-            PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY_LEFT_A, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
+            LogEntry_R(std::string("PipeServerThread Counter: ") + std::to_string(counter++) + std::string("\r\n"));
         }
         catch (const std::string&) {}
+        ::Sleep(500);
+        
 
+        // 1, ScanSystemMemoryAccess [R]
+        std::vector<HandleAccessRecord> har;
+        try {
+            LogEntry_R(ScanSystemMemoryAccess(har));
+            LogEntry_R(ProcessScanResults(har));
+            LogEntry_R(MemoryDetector(g_hWnd, har));
+        }
+        catch (const std::string&) {}
+        ::Sleep(500);
+
+        // continue; // [DEBUG OK v1.86 - 2]
+
+        /**
         try {
             COLORREF logColor = RGB(255, 180, 0);
             wchar_t procNameBuf[256] = { 0 };
@@ -736,7 +758,7 @@ static void PipeServerThread() {
         }
 **/
         //
-        // DLL Injection
+        // DLL Injection: PIPE Recive
         //
         HANDLE hPipe = CreateNamedPipeW(
             GUARDIAN_PIPE_NAME,
@@ -816,11 +838,7 @@ static void PipeServerThread() {
                     return;
 
                 try {
-                    std::wstring logStr = ss.str();
-                    wchar_t *pText = new wchar_t[logStr.size() + 1];
-                    wcscpy_s(pText, logStr.size() + 1, logStr.c_str());
-
-                    PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY_LEFT, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
+                    LogEntry_L(WStringToString(ss.str()), logColor);
                 } catch (const std::string &) {}
             }
         }
@@ -1157,7 +1175,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.86 - 1",
+        L"AI Agent Memory Checker v1.86 - 2",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
