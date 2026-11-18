@@ -567,6 +567,8 @@ static void PipeServerThread() {
     bool fLogLeft = true;
     bool fLogRight = true;
 
+    wchar_t procNameBuf[256] = { 0 };
+    GetWindowTextW(g_hEditProcessName, procNameBuf, 256);
     int32_t counter = 0;
     while (g_thread) {
         try {
@@ -586,14 +588,7 @@ static void PipeServerThread() {
         catch (const std::string&) {}
         ::Sleep(500);
 
-        // continue; // [DEBUG OK v1.86 - 2]
-
-        /**
         try {
-            COLORREF logColor = RGB(255, 180, 0);
-            wchar_t procNameBuf[256] = { 0 };
-            GetWindowTextW(g_hEditProcessName, procNameBuf, 256);
-
             if (wcslen(procNameBuf) > 0) {
                 std::vector<DWORD> pids = GetPidsByProcessName(procNameBuf);
                 std::ostringstream ss;
@@ -601,36 +596,19 @@ static void PipeServerThread() {
                 for (auto targetPid: pids) {
                     ss << InspectTargetNetwork(targetPid, WStringToString(std::wstring(procNameBuf)));
                 }
-                std::string logStr = ss.str();
-                char* pText = new char[logStr.size() + 1];
-                strcpy_s(pText, logStr.size() + 1, logStr.c_str());
-
-                PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY_LEFT_A, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
-            }
-        }
-        catch (const std::string&) {}
-
-        try {
-            COLORREF logColor = RGB(255, 180, 0);
-            wchar_t procNameBuf[256] = { 0 };
-            GetWindowTextW(g_hEditProcessName, procNameBuf, 256);
-
-            if (wcslen(procNameBuf) > 0) {
-                std::vector<DWORD> pids = GetPidsByProcessName(procNameBuf);
-                std::ostringstream ss;
                 ss << "InspectSectionObjects Common Memory ---\n";
                 for (auto targetPid : pids) {
                     ss << InspectSectionObjects(targetPid, WStringToString(std::wstring(procNameBuf)));
                 }
-                std::string logStr = ss.str();
-                char* pText = new char[logStr.size() + 1];
-                strcpy_s(pText, logStr.size() + 1, logStr.c_str());
-
-                PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY_LEFT_A, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
+                LogEntry_L(ss.str());
             }
         }
         catch (const std::string&) {}
+        ::Sleep(500);
 
+        continue; // [v1.86 -3 OK]
+
+        /**
         try {
             COLORREF logColor = RGB(255, 180, 0);
             wchar_t procNameBuf[256] = { 0 };
@@ -784,9 +762,6 @@ static void PipeServerThread() {
                 std::wostringstream ss;
                 ss << L"[" << std::setfill(L'0') << std::setw(2) << st.wHour << L":"
                    << std::setw(2) << st.wMinute << L":" << std::setw(2) << st.wSecond << L"] ";
-
-                wchar_t procNameBuf[256] = { 0 };
-                GetWindowTextW(g_hEditProcessName, procNameBuf, 256);
                 ss << InspectTargetHandles(std::wstring(procNameBuf)).c_str();
 
                 COLORREF logColor = RGB(200, 200, 200);
@@ -1175,7 +1150,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.86 - 2",
+        L"AI Agent Memory Checker v1.86 - 3",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
