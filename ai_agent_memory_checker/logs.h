@@ -14,7 +14,10 @@ extern std::string g_NtAlpcCreatePortLogs; // main.cpp
 // Singleton
 class LogQueueManager {
 private:
-    LogQueueManager() {}
+    LogQueueManager() {
+        logQueue.reserve(100000);
+    }
+
     std::vector<std::string> logQueue;
     std::mutex queueMutex;
 

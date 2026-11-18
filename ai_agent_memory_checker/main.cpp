@@ -629,6 +629,7 @@ static void PipeServerThread() {
         ::Sleep(500);
 
         // LogQueueManager
+        try {
             {
                 std::vector<std::string> outLogs;
                 if(LogQueueManager::GetInstanceLeft().FlushLogs(outLogs)) {
@@ -642,16 +643,16 @@ static void PipeServerThread() {
                 std::vector<std::string> outLogs;
                 if (LogQueueManager::GetInstanceRight().FlushLogs(outLogs)) {
                     for (const auto &logStr : outLogs) {
-                        LogEntry_L(logStr);
+                        LogEntry_R(logStr);
                     }
                 }
             }
+        } catch (const std::string&) {}
+        ::Sleep(500);
 
-        continue; // [v1.86 - 7 OK]
+        continue; // [v1.86 - 8 OK]
 
-        //
         // DLL Injection: PIPE Recive
-        //
         HANDLE hPipe = CreateNamedPipeW(
             GUARDIAN_PIPE_NAME,
             PIPE_ACCESS_INBOUND,
@@ -662,13 +663,16 @@ static void PipeServerThread() {
             0, nullptr
         );
         if (hPipe == INVALID_HANDLE_VALUE) {
-            Sleep(1000);
+            LogEntry_L(std::string("hPipe: INVALID_HANDLE_VALUE\n\n"));
+            Sleep(500);
             continue;
         }
+
         if (ConnectNamedPipe(hPipe, nullptr) || GetLastError() == ERROR_PIPE_CONNECTED) {
             GuardianAlertEvent alert;
             DWORD bytesRead = 0;
 
+            LogEntry_L(std::string("ConnectNamedPipe: ReadFile\n"));
             if (ReadFile(hPipe, &alert, sizeof(GuardianAlertEvent), &bytesRead, nullptr)) {
                 SYSTEMTIME st;
                 GetLocalTime(&st);
@@ -677,16 +681,14 @@ static void PipeServerThread() {
                 ss << L"[" << std::setfill(L'0') << std::setw(2) << st.wHour << L":"
                    << std::setw(2) << st.wMinute << L":" << std::setw(2) << st.wSecond << L"] ";
                 ss << InspectTargetHandles(std::wstring(procNameBuf)).c_str();
+                LogEntry_L(WStringToString(ss.str()));
 
-                COLORREF logColor = RGB(200, 200, 200);
                 std::string debugger = RunDebuggerForensics(alert.targetPid);
                 std::string handles = CheckOpenHandles(alert.targetPid);
-
                 if (alert.type == AlertType::MemoryRead) {
-
                     ForensicArchiver::GetInstance().ProcessCapturedPayload(0, "", SignatureEngine::LogCategory::Alert, WStringToString(std::wstring(procNameBuf)));
 
-                    logColor = RGB(255, 80, 80);
+                    COLORREF logColor = RGB(255, 80, 80);
                     ss << L"[ALERT: Memory Read Detected]\n"
                        << L"  „¥„Ÿ Source PID : " << alert.sourcePid << " (" << GetProcessNameFromPID(alert.sourcePid).c_str() << L") \n"
                        << L"  „¥„Ÿ Target PID : " << alert.targetPid << " (" << GetProcessNameFromPID(alert.targetPid).c_str() << L") \n"
@@ -695,18 +697,20 @@ static void PipeServerThread() {
                        << L"  „¥„Ÿ Hex        : " << std::hex << ToHexString(alert.buf, sizeof(alert.buf) < alert.bufferSize ? sizeof(alert.buf): alert.bufferSize).c_str() << std::dec << L"\n"
                        << L"  „¥„Ÿ Debugger   : " << debugger.c_str() << L"\n"
                        << L"  „¤„Ÿ Handles    : " << handles.c_str() << L"\n\n";
+                    LogEntry_L(WStringToString(ss.str()), logColor);
                 }
                 else if (alert.type == AlertType::ProcessOpen) {
-                    logColor = RGB(255, 180, 0);
+                    COLORREF logColor = RGB(255, 180, 0);
                     ss << L"[WARN: Process Handle Opened]\n"
                        << L"  „¥„Ÿ Source PID : " << alert.sourcePid << " (" << GetProcessNameFromPID(alert.sourcePid).c_str() << L") \n"
                        << L"  „¥„Ÿ Target PID : " << alert.targetPid << " (" << GetProcessNameFromPID(alert.targetPid).c_str() << L") \n"
                        << L"  „¥„Ÿ Access     : 0x" << std::hex << alert.desiredAccess << std::dec << L"\n"
                        << L"  „¥„Ÿ Debugger   : " << debugger.c_str() << L"\n"
                        << L"  „¤„Ÿ Handles    : " << handles.c_str() << L"\n\n";
+                    LogEntry_L(WStringToString(ss.str()), logColor);
                 }
                 else if (alert.type == AlertType::CommonMapView) {
-                    logColor = RGB(255, 180, 0);
+                    COLORREF logColor = RGB(255, 180, 0);
                     ss << L"[ALERT: Shared Memory Mapped]\n"
                        << L"  „¥„Ÿ Target PID  : " << alert.targetPid << " (" << GetProcessNameFromPID(alert.targetPid).c_str() << L") \n"
                        << L"  „¥„Ÿ Mapped Addr : 0x" << std::hex << alert.baseAddress << std::dec << L"\n"
@@ -714,26 +718,24 @@ static void PipeServerThread() {
                        << L"  „¥„Ÿ Data Peek   : " << std::hex << ToHexString(alert.buf, sizeof(alert.buf) < alert.bufferSize ? sizeof(alert.buf) : alert.bufferSize).c_str() << std::dec << L"\n"
                        << L"  „¥„Ÿ Debugger    : " << debugger.c_str() << L"\n"
                        << L"  „¤„Ÿ Handles     : " << handles.c_str() << L"\n\n";
+                    LogEntry_L(WStringToString(ss.str()), logColor);
                 }
                 else if (alert.type == AlertType::DuplicateObject) {
-                    logColor = RGB(255, 180, 0);
+                    COLORREF logColor = RGB(255, 180, 0);
                     ss << L"[WARN: Foreign Handle Duplicated]\n"
                        << L"  „¥„Ÿ Source PID    : " << alert.sourcePid << " (" << GetProcessNameFromPID(alert.sourcePid).c_str() << L") \n"
                        << L"  „¥„Ÿ DesiredAccess : 0x" << std::hex << alert.desiredAccess << "\n"
                        << L"  „¥„Ÿ Stolen Handle : 0x" << alert.targetPid << " (" << GetProcessNameFromPID(alert.targetPid).c_str() << L") \n"
                        << L"  „¥„Ÿ Debugger      : " << debugger.c_str() << L"\n"
                        << L"  „¤„Ÿ Handles       : " << handles.c_str() << L"\n\n";
-                } else
-                    return;
-
-                try {
                     LogEntry_L(WStringToString(ss.str()), logColor);
-                } catch (const std::string &) {}
+                }
             }
         }
 
         DisconnectNamedPipe(hPipe);
         CloseHandle(hPipe);
+        ::Sleep(500);
     }
 }
 
@@ -1064,7 +1066,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.86 - 7",
+        L"AI Agent Memory Checker v1.86 - 8",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
