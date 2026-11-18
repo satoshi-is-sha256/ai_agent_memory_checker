@@ -628,40 +628,27 @@ static void PipeServerThread() {
         catch (const std::string&) {}
         ::Sleep(500);
 
-        continue; // [v1.86 - 6 OK]
-
-        /**
-        static int logs_counter = 0;
-        if(++logs_counter == 20) {
+        // LogQueueManager
             {
-                COLORREF logColor = RGB(255, 180, 0);
                 std::vector<std::string> outLogs;
                 if(LogQueueManager::GetInstanceLeft().FlushLogs(outLogs)) {
                     for(const auto &logStr: outLogs) {
-                        char *pText = new char[logStr.size() + 1];
-                        strcpy_s(pText, logStr.size() + 1, logStr.c_str());
-
-                        PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY_LEFT_A, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
+                        LogEntry_L(logStr);
                     }
                 }
             }
 
             {
-                COLORREF logColor = RGB(255, 180, 0);
                 std::vector<std::string> outLogs;
                 if (LogQueueManager::GetInstanceRight().FlushLogs(outLogs)) {
                     for (const auto &logStr : outLogs) {
-                        char *pText = new char[logStr.size() + 1];
-                        strcpy_s(pText, logStr.size() + 1, logStr.c_str());
-
-                        PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY_RIGHT_A, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
+                        LogEntry_L(logStr);
                     }
                 }
             }
 
-            logs_counter = 0;
-        }
-**/
+        continue; // [v1.86 - 7 OK]
+
         //
         // DLL Injection: PIPE Recive
         //
@@ -1077,7 +1064,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.86 - 6",
+        L"AI Agent Memory Checker v1.86 - 7",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
