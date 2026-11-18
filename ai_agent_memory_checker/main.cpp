@@ -564,9 +564,6 @@ void LogEntry_R(const std::string &logStr, COLORREF logColor = RGB(255, 180, 0))
 }
 
 static void PipeServerThread() {
-    bool fLogLeft = true;
-    bool fLogRight = true;
-
     wchar_t procNameBuf[256] = { 0 };
     GetWindowTextW(g_hEditProcessName, procNameBuf, 256);
     int32_t counter = 0;
@@ -604,50 +601,20 @@ static void PipeServerThread() {
                 for (auto targetPid : pids) {
                     ss << ScanIncomingProcessAccess(targetPid, WStringToString(std::wstring(procNameBuf)));
                 }
+                ss << "InspectAlpcAndPipes ---\n";
+                for (auto targetPid : pids) {
+                    ss << InspectAlpcAndPipes(targetPid, WStringToString(std::wstring(procNameBuf)));
+                }
+                ss << "Unname Pipe Logs: " << g_NtAlpcCreatePortLogs << " ---\n\n";
                 LogEntry_L(ss.str());
             }
         }
         catch (const std::string&) {}
         ::Sleep(500);
 
-        continue; // [v1.86 - 4 OK]
+        continue; // [v1.86 - 5 OK]
 
-/**
-        try {
-
-            if (fLogLeft) {
-                COLORREF logColor = RGB(255, 180, 0);
-                std::string logStr = "Start ...\n\n";
-                char* pText = new char[logStr.size() + 1];
-                strcpy_s(pText, logStr.size() + 1, logStr.c_str());
-                PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY_LEFT_A, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
-                fLogLeft = false;
-            }
-
-            COLORREF logColor = RGB(255, 180, 0);
-            wchar_t procNameBuf[256] = { 0 };
-            GetWindowTextW(g_hEditProcessName, procNameBuf, 256);
-
-            if (wcslen(procNameBuf) > 0) {
-                std::ostringstream ss;
-                ss << WStringToString(std::wstring(procNameBuf)) << " ---\n";
-                std::vector<DWORD> pids = GetPidsByProcessName(procNameBuf);
-                ss << "InspectAlpcAndPipes ---\n";
-                for (auto targetPid : pids) {
-                    ss << InspectAlpcAndPipes(targetPid, WStringToString(std::wstring(procNameBuf)));
-                }
-
-                ss << "Unname Pipe Logs: " << g_NtAlpcCreatePortLogs << " ---\n\n";
-
-                std::string logStr = ss.str();
-                char* pText = new char[logStr.size() + 1];
-                strcpy_s(pText, logStr.size() + 1, logStr.c_str());
-
-                PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY_LEFT_A, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
-            }
-        }
-        catch (const std::string&) {}
-
+        /**
         try {
 
             if (fLogRight) {
@@ -1131,7 +1098,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.86 - 4",
+        L"AI Agent Memory Checker v1.86 - 5",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
