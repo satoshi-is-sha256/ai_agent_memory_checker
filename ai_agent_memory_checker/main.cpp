@@ -649,9 +649,13 @@ static void PipeServerThread() {
             }
         } catch (const std::string&) {}
         ::Sleep(500);
+    }
+}
 
-        continue; // [v1.86 - 8 OK]
-
+static void PipeServerThread2() {
+    wchar_t procNameBuf[256] = { 0 };
+    GetWindowTextW(g_hEditProcessName, procNameBuf, 256);
+    while (g_thread) {
         // DLL Injection: PIPE Recive
         HANDLE hPipe = CreateNamedPipeW(
             GUARDIAN_PIPE_NAME,
@@ -667,6 +671,8 @@ static void PipeServerThread() {
             Sleep(500);
             continue;
         }
+
+        LogEntry_L(std::string("DLL Injection: PIPE Recive Loaded.\n\n"));
 
         if (ConnectNamedPipe(hPipe, nullptr) || GetLastError() == ERROR_PIPE_CONNECTED) {
             GuardianAlertEvent alert;
@@ -901,6 +907,7 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
 
         g_thread = true;
         std::thread(PipeServerThread).detach();
+        std::thread(PipeServerThread2).detach();
         AppendLogText(hLogEditLeft, L"[OK] PipeServerThread listener initialized.\n\n", RGB(100, 200, 250));
         break;
     }
@@ -1066,7 +1073,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.86 - 8",
+        L"AI Agent Memory Checker v1.86 - 9",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
