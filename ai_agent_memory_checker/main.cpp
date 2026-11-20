@@ -80,7 +80,7 @@ HWND g_hEditProcessName = nullptr;
 bool g_thread = false;
 
 // alpc.h
-pfnNtAlpcCreatePort NtAlpcCreatePortOrg = nullptr;
+pfnNtAlpcCreatePort CAlpc::NtAlpcCreatePortOrg = nullptr;
 std::string g_NtAlpcCreatePortLogs;
 
 // commonmemorymapping.h
@@ -512,7 +512,7 @@ static void PipeServerThread() {
                 }
                 ss << "InspectAlpcAndPipes ---\n";
                 for (auto targetPid : pids) {
-                    ss << InspectAlpcAndPipes(targetPid, WStringToString(std::wstring(procNameBuf)));
+                    ss << CAlpc::InspectAlpcAndPipes(targetPid, WStringToString(std::wstring(procNameBuf)));
                 }
                 ss << "Unname Pipe Logs: " << g_NtAlpcCreatePortLogs << " ---\n\n";
                 LogEntry_L(ss.str());
@@ -1020,7 +1020,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.86 - 10",
+        L"AI Agent Memory Checker v1.86 - 11",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
@@ -1034,8 +1034,10 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     ShowWindow(g_hWnd, nCmdShow);
     UpdateWindow(g_hWnd);
 
+
+    CAlpc::InitializeAlpcHooks();
+
 /**
-    InitializeAlpcHooks();
     CCommonMemory::InitializeSectionHooks();
     CALPCBACK::InitializeNamedPipeHooks();
     CDiskIo::InitializeFileIoHooks();
@@ -1081,8 +1083,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
         DispatchMessageW(&msg);
     }
 
+    CAlpc::UninitializeAlpcHooks();
+
 /**
-    UninitializeAlpcHooks();
     CCommonMemory::UninitializeSectionHooks();
     CALPCBACK::UninitializeNamedPipeHooks();
     CDiskIo::UninitializeFileIoHooks();
