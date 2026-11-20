@@ -221,342 +221,14 @@ PFN_VIRTUALALLOCEX CMemoryInjectionAudit::Real_VirtualAllocEx = nullptr;
 PFN_VIRTUALPROTECTEX CMemoryInjectionAudit::Real_VirtualProtectEx = nullptr;
 PFN_CREATEREMOTETHREAD CMemoryInjectionAudit::Real_CreateRemoteThread = nullptr;
 
-static std::string RunDebuggerForensics(DWORD targetProcessId) {
-    std::ostringstream stream;
-    stream << "[*] Starting Debugger Forensics for PID: " << targetProcessId << std::endl;
-
-    HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, targetProcessId);
-    if (!hProcess) {
-        stream << "[-] Failed to open target process. Error: " << GetLastError() << std::endl;
-        return stream.str();
-    }
-
-    bool standardDbg = CheckStandardDebugger(hProcess);
-    bool portDbg = CheckDebugPort(hProcess);
-    bool objectDbg = CheckDebugObject(hProcess);
-
-    stream << "----------------------------------------" << std::endl;
-    stream << " [Check 1] Standard Remote Debugger : " << (standardDbg ? "[DETECTED]" : "Clean") << std::endl;
-    stream << " [Check 2] Native Debug Port (7)    : " << (portDbg ? "[DETECTED]" : "Clean") << std::endl;
-    stream << " [Check 3] Debug Object Handle (30) : " << (objectDbg ? "[DETECTED]" : "Clean") << std::endl;
-    stream << "----------------------------------------" << std::endl;
-
-    if (standardDbg || portDbg || objectDbg)
-        std::cout << "[!] WARNING: External debugging / memory inspection mechanism detected!" << std::endl;
-    else
-        std::cout << "[+] No active debugger hooks found via these vectors." << std::endl;
-
-    CloseHandle(hProcess);
-    return stream.str();
-}
-
-static std::string GetProcessFullPath(DWORD pid) {
-    std::string path = "Unknown";
-    HANDLE hProc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
-    if (hProc) {
-        WCHAR buffer[MAX_PATH];
-        DWORD size = MAX_PATH;
-        if (QueryFullProcessImageNameW(hProc, 0, buffer, &size)) {
-            path = WStringToString(std::wstring(buffer));
-        }
-        CloseHandle(hProc);
-    }
-    return path;
-}
-
-static std::string GetProcessNameFromPID(DWORD processId) {
-    if (processId == 0) return "System Idle Process";
-    if (processId == 4) return "System";
-
-    HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId);
-    if (!hProcess) {
-        return "Unknown Process (Access Denied)";
-    }
-
-    WCHAR imagePath[MAX_PATH] = { 0 };
-    DWORD size = MAX_PATH;
-    std::string processName = "Unknown";
-
-    if (QueryFullProcessImageNameW(hProcess, 0, imagePath, &size)) {
-        std::wstring fullPath(imagePath);
-        size_t lastSlash = fullPath.find_last_of(L"\\/");
-        if (lastSlash != std::wstring::npos) {
-            std::wstring fileName = fullPath.substr(lastSlash + 1);
-            processName = WStringToString(fileName);
-        }
-    }
-
-    CloseHandle(hProcess);
-    return processName;
-}
-
-static std::string GetProcessNameFromPID2(DWORD pid) {
-    if (pid == 0) return "System / Idle";
-
-    std::wstring procName = L"Unknown";
-    HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-    if (hSnap != INVALID_HANDLE_VALUE) {
-        PROCESSENTRY32W pe;
-        pe.dwSize = sizeof(pe);
-        if (Process32FirstW(hSnap, &pe)) {
-            do {
-                if (pe.th32ProcessID == pid) {
-                    procName = pe.szExeFile;
-                    break;
-                }
-            } while (Process32NextW(hSnap, &pe));
-        }
-        CloseHandle(hSnap);
-    }
-
-    return WStringToString(procName);
-}
-
-struct HandleAccessRecord {
-    DWORD sourcePid;
-    DWORD targetPid;
-    DWORD accessRights;
-
-    HandleAccessRecord() {
-        sourcePid = 0;
-        targetPid = 0;
-        accessRights = 0;
-    }
-
-    bool operator<(const HandleAccessRecord &other) const {
-        if (sourcePid != other.sourcePid) return sourcePid < other.sourcePid;
-        if (targetPid != other.targetPid) return targetPid < other.targetPid;
-        return accessRights < other.accessRights;
-    }
-};
-
-static std::string ProcessScanResults(const std::vector<HandleAccessRecord> &currentScan) {
-    static std::set<HandleAccessRecord> g_previousHandles;
-
-    std::set<HandleAccessRecord> currentHandles(currentScan.begin(), currentScan.end());
-    std::set<HandleAccessRecord> newlyAdded;
-
-    std::set_difference(
-        currentHandles.begin(), currentHandles.end(),
-        g_previousHandles.begin(), g_previousHandles.end(),
-        std::inserter(newlyAdded, newlyAdded.end())
-    );
-
-    std::stringstream ss;
-    ss << "[*] Starting ProcessScanResults." << std::endl;
-    for (const auto &record : newlyAdded) {
-        std::string timestamp = GetCurrentTimestamp();
-        std::string sourceName = GetProcessNameFromPID2(record.sourcePid);
-        std::string targetName = GetProcessNameFromPID2(record.targetPid);
-
-        ss << "[" << timestamp << "] [!] [NEW ACCESS TRIGGERED]" << std::endl;
-        ss << "    -> Source: PID " << record.sourcePid << " (" << sourceName << ")" << std::endl;
-        ss << "    -> Target: PID " << record.targetPid << " (" << targetName << ")" << std::endl;
-        ss << "    -> Rights: 0x" << std::hex << record.accessRights << std::dec << std::endl;
-        ss << "--------------------------------------------------" << std::endl;
-    }
-
-    g_previousHandles = currentHandles;
-    return ss.str();
-}
-
-static std::string MemoryDetector(HWND hWnd, const std::vector<HandleAccessRecord> &currentScan) {
-    static std::set<HandleAccessRecord> g_previousHandles;
-    static bool g_isFirstScan = true;
-
-    std::ostringstream ss;
-    ss << "[*] Starting MemoryDetector, counter: " << currentScan.size() << std::endl;
-
-    std::set<HandleAccessRecord> currentHandles(currentScan.begin(), currentScan.end());
-    if (g_isFirstScan) {
-        g_previousHandles = currentHandles;
-        g_isFirstScan = false;
-        ss << "[OK] Starting MemoryDetector, First: skip" << std::endl;
-        return ss.str();
-    }
-
-    std::set<HandleAccessRecord> newlyAdded;
-    std::set_difference(
-        currentHandles.begin(), currentHandles.end(),
-        g_previousHandles.begin(), g_previousHandles.end(),
-        std::inserter(newlyAdded, newlyAdded.end())
-    );
-    ss << "[OK] Starting MemoryDetector, set_difference" << std::endl;
-
-    DWORD userSpecifiedPid = GetDlgItemInt(hWnd, IDC_PID_INPUT, nullptr, FALSE);
-    char process[MAX_PATH];
-    GetDlgItemTextA(hWnd, IDC_PROCESS_NAME_INPUT, process, MAX_PATH);
-    std::string userSpecifiedName = process;
-
-    for (const auto &record: newlyAdded) {
-        std::string sourceName = GetProcessNameFromPID2(record.sourcePid);
-        std::string targetName = GetProcessNameFromPID2(record.targetPid);
-        std::string sourcePath = GetProcessFullPath(record.sourcePid);
-
-        if (IsTargetWatched(record.targetPid, userSpecifiedPid, targetName, userSpecifiedName)) {
-            bool canRead = (record.accessRights & PROCESS_VM_READ) != 0;
-            bool canWrite = (record.accessRights & PROCESS_VM_WRITE) != 0;
-            bool canCreateThread = (record.accessRights & PROCESS_CREATE_THREAD) != 0;
-
-            if (canRead || canWrite || canCreateThread) {
-                ss << "[!] [TARGET MEMORY ACCESS DETECTED]" << std::endl;
-                ss << "    -> Target: PID " << record.targetPid << " (" << targetName << ")" << std::endl;
-                ss << "    -> Sleuth: PID " << record.sourcePid << " (" << sourceName << ")" << std::endl;
-                ss << "    -> Path:   " << sourcePath << std::endl;
-                ss << "    -> Rights: 0x" << std::hex << record.accessRights << std::dec;
-        
-                if (canRead) ss << " [VM_READ (Memory Sucking?)]";
-                if (canWrite) ss << " [VM_WRITE]";
-                ss << std::endl << "--------------------------------------------------" << std::endl;
-            }
-        }
-    }
-
-    return ss.str();
-}
-
-static std::string ScanSystemMemoryAccess(std::vector<HandleAccessRecord> &har) {
-    std::ostringstream ss;
-    ss << "[*] Starting ScanSystemMemoryAccess." << std::endl;
-    HMODULE hNtdll = GetModuleHandleW(L"ntdll.dll");
-    if (!hNtdll) return ss.str();
-
-    auto NtQuerySysInfo = reinterpret_cast<pfnNtQuerySystemInformation>(GetProcAddress(hNtdll, "NtQuerySystemInformation"));
-    if (!NtQuerySysInfo) return ss.str();
-
-    ULONG bufferSize = 0x10000;
-    PVOID buffer = nullptr;
-    NTSTATUS status = 0;
-    do {
-        if (buffer) VirtualFree(buffer, 0, MEM_RELEASE);
-        buffer = VirtualAlloc(nullptr, bufferSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-        if (!buffer) return ss.str();
-
-        status = NtQuerySysInfo(SystemHandleInformation, buffer, bufferSize, &bufferSize);
-        if (status == STATUS_INFO_LENGTH_MISMATCH)
-            bufferSize *= 2;
-    } while (status == STATUS_INFO_LENGTH_MISMATCH);
-
-    if (!NT_SUCCESS(status)) {
-        if (buffer) VirtualFree(buffer, 0, MEM_RELEASE);
-        ss << "[-] NtQuerySystemInformation failed." << std::endl;
-        return ss.str();
-    }
-
-    const auto *handleInfo = reinterpret_cast<PSYSTEM_HANDLE_INFORMATION>(buffer);
-    ss << "[+] Total system handles to inspect: " << handleInfo->NumberOfHandles << std::endl;
-
-    std::vector<HandleAccessRecord> currentScan;
-    currentScan.reserve(10000);
-    const int limiter = 30;
-    int counter = 0;
-    for (ULONG i = 0; i < handleInfo->NumberOfHandles; ++i) {
-        HandleAccessRecord handleRecord;
-        const auto &entry = handleInfo->Handles[i];
-
-        DWORD sourcePid = handleRecord.sourcePid = entry.UniqueProcessId;
-        HANDLE hRemoteHandle = reinterpret_cast<HANDLE>(entry.HandleValue);
-        ULONG grantedAccess = handleRecord.accessRights = entry.GrantedAccess;
-        if (sourcePid == 0 || sourcePid == 4) continue;
-
-        HANDLE hTargetProcess = OpenProcess(PROCESS_DUP_HANDLE | PROCESS_QUERY_INFORMATION, FALSE, sourcePid);
-        if (!hTargetProcess) continue;
-
-        std::string typeName, objectName;
-        if (GetHandleDetails(hTargetProcess, hRemoteHandle, typeName, objectName)) {
-            if (typeName == "Process") {
-
-                const bool canRead = (grantedAccess & PROCESS_VM_READ) != 0;
-                const bool canWrite = (grantedAccess & PROCESS_VM_WRITE) != 0;
-                //const bool canOperate = (grantedAccess & PROCESS_VM_OPERATION) != 0;
-                const bool canCreateThread = (grantedAccess & PROCESS_CREATE_THREAD) != 0;
-                const bool isFullAccess = (grantedAccess & 0x1F0FFF) == 0x1F0FFF;
-
-                if (canRead || canWrite || canCreateThread || isFullAccess) {
-                    HANDLE hLocalDuplicate = nullptr;
-                    if (DuplicateHandle(hTargetProcess, hRemoteHandle, GetCurrentProcess(), &hLocalDuplicate, 0, FALSE, DUPLICATE_SAME_ACCESS)) {
-                        DWORD targetPid = handleRecord.targetPid = GetProcessId(hLocalDuplicate);
-                        CloseHandle(hLocalDuplicate);
-
-                        if (targetPid != 0 && targetPid != sourcePid) {
-                            std::string sourceName = GetProcessNameFromPID2(sourcePid);
-                            std::string targetName = GetProcessNameFromPID2(targetPid);
-                            std::string sourcePath = GetProcessFullPath(sourcePid);
-
-                            std::string threatLevel = "[INFO / Normal]";
-                            if (isFullAccess || canCreateThread || canWrite) {
-                                threatLevel = "[!] [HIGH RISK] Potential Injection/Control!";
-                            } else if (canRead) {
-                                threatLevel = "[!] [MEDIUM RISK] Memory Read Access";
-                            }
-
-                            ss << threatLevel << std::endl;
-                            ss << "    -> Source: PID " << sourcePid << " (" << sourceName << ")" << std::endl;
-                            ss << "    -> Path:   " << sourcePath << std::endl;
-                            ss << "    -> Target: PID " << targetPid << " (" << targetName << ")" << std::endl;
-                            ss << "    -> Rights: 0x" << std::hex << grantedAccess << std::dec;
-
-                            std::wcout << L" [ ";
-                            if (isFullAccess) ss << "ALL_ACCESS ";
-                            if (canCreateThread) ss << "CREATE_THREAD ";
-                            if (canWrite) ss << "VM_WRITE ";
-                            if (canRead) ss << "VM_READ ";
-                            ss << "]" << std::endl;
-                
-                            ss << "--------------------------------------------------" << std::endl;
-
-                            if(counter++ == limiter) {
-                                CloseHandle(hTargetProcess);
-                                break;
-                            }
-                            currentScan.push_back(handleRecord);
-                        }
-                    }
-                }
-
-                if ((grantedAccess & PROCESS_VM_READ) || (grantedAccess & 0x1F0FFF)) {
-                    HANDLE hLocalDuplicate = nullptr;
-                    if (DuplicateHandle(hTargetProcess, hRemoteHandle, GetCurrentProcess(), &hLocalDuplicate, 0, FALSE, DUPLICATE_SAME_ACCESS)) {
-                        DWORD targetPid = GetProcessId(hLocalDuplicate);
-                        CloseHandle(hLocalDuplicate);
-
-                        if (targetPid != 0 && targetPid != sourcePid) {
-                            std::string sourceName = GetProcessNameFromPID2(sourcePid);
-                            std::string targetName = GetProcessNameFromPID2(targetPid);
-
-                            ss << "[!] Cross-Process Memory Access Detected!" << std::endl;
-                            ss << "    -> Source: PID " << sourcePid << " (" << sourceName << ")" << std::endl;
-                            ss << "    -> Target: PID " << targetPid << " (" << targetName << ")" << std::endl;
-                            ss << "    -> Access Rights: 0x" << std::hex << grantedAccess << std::dec << std::endl;
-                            ss << "--------------------------------------------------" << std::endl;
-
-                            if(counter++ == limiter) {
-                                CloseHandle(hTargetProcess);
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        CloseHandle(hTargetProcess);
-    }
-
-    har = std::move(currentScan);
-
-    VirtualFree(buffer, 0, MEM_RELEASE);
-    return ss.str();
-}
-
-void LogEntry_L(const std::string &logStr, COLORREF logColor = RGB(255, 180, 0)) {
+static void LogEntry_L(const std::string &logStr, COLORREF logColor = RGB(255, 180, 0)) {
     char *pText = new char[logStr.size() + 1];
     strcpy_s(pText, logStr.size() + 1, logStr.c_str());
 
     PostMessageW(g_hWnd, WM_ADD_LOG_ENTRY_LEFT_A, reinterpret_cast<WPARAM>(pText), static_cast<LPARAM>(logColor));
 }
 
-void LogEntry_R(const std::string &logStr, COLORREF logColor = RGB(255, 180, 0)) {
+static void LogEntry_R(const std::string &logStr, COLORREF logColor = RGB(255, 180, 0)) {
     char *pText = new char[logStr.size() + 1];
     strcpy_s(pText, logStr.size() + 1, logStr.c_str());
 
@@ -564,12 +236,249 @@ void LogEntry_R(const std::string &logStr, COLORREF logColor = RGB(255, 180, 0))
 }
 
 static void PipeServerThread() {
+    struct HandleAccessRecord {
+        DWORD sourcePid;
+        DWORD targetPid;
+        DWORD accessRights;
+
+        HandleAccessRecord() {
+            sourcePid = 0;
+            targetPid = 0;
+            accessRights = 0;
+        }
+
+        bool operator<(const HandleAccessRecord &other) const {
+            if (sourcePid != other.sourcePid) return sourcePid < other.sourcePid;
+            if (targetPid != other.targetPid) return targetPid < other.targetPid;
+            return accessRights < other.accessRights;
+        }
+    };
+
+    auto ProcessScanResults = [](const std::vector<HandleAccessRecord> &currentScan) {
+        static std::set<HandleAccessRecord> g_previousHandles;
+
+        std::set<HandleAccessRecord> currentHandles(currentScan.begin(), currentScan.end());
+        std::set<HandleAccessRecord> newlyAdded;
+
+        std::set_difference(
+            currentHandles.begin(), currentHandles.end(),
+            g_previousHandles.begin(), g_previousHandles.end(),
+            std::inserter(newlyAdded, newlyAdded.end())
+        );
+
+        std::stringstream ss;
+        ss << "[*] Starting ProcessScanResults." << std::endl;
+        for (const auto &record : newlyAdded) {
+            std::string timestamp = GetCurrentTimestamp();
+            std::string sourceName = GetProcessNameFromPID2(record.sourcePid);
+            std::string targetName = GetProcessNameFromPID2(record.targetPid);
+
+            ss << "[" << timestamp << "] [!] [NEW ACCESS TRIGGERED]" << std::endl;
+            ss << "    -> Source: PID " << record.sourcePid << " (" << sourceName << ")" << std::endl;
+            ss << "    -> Target: PID " << record.targetPid << " (" << targetName << ")" << std::endl;
+            ss << "    -> Rights: 0x" << std::hex << record.accessRights << std::dec << std::endl;
+            ss << "--------------------------------------------------" << std::endl;
+        }
+
+        g_previousHandles = currentHandles;
+        return ss.str();
+    };
+
+    auto MemoryDetector = [](HWND hWnd, const std::vector<HandleAccessRecord> &currentScan) {
+        static std::set<HandleAccessRecord> g_previousHandles;
+        static bool g_isFirstScan = true;
+
+        std::ostringstream ss;
+        ss << "[*] Starting MemoryDetector, counter: " << currentScan.size() << std::endl;
+
+        std::set<HandleAccessRecord> currentHandles(currentScan.begin(), currentScan.end());
+        if (g_isFirstScan) {
+            g_previousHandles = currentHandles;
+            g_isFirstScan = false;
+            ss << "[OK] Starting MemoryDetector, First: skip" << std::endl;
+            return ss.str();
+        }
+
+        std::set<HandleAccessRecord> newlyAdded;
+        std::set_difference(
+            currentHandles.begin(), currentHandles.end(),
+            g_previousHandles.begin(), g_previousHandles.end(),
+            std::inserter(newlyAdded, newlyAdded.end())
+        );
+        ss << "[OK] Starting MemoryDetector, set_difference" << std::endl;
+
+        DWORD userSpecifiedPid = GetDlgItemInt(hWnd, IDC_PID_INPUT, nullptr, FALSE);
+        char process[MAX_PATH];
+        GetDlgItemTextA(hWnd, IDC_PROCESS_NAME_INPUT, process, MAX_PATH);
+        std::string userSpecifiedName = process;
+
+        for (const auto &record: newlyAdded) {
+            std::string sourceName = GetProcessNameFromPID2(record.sourcePid);
+            std::string targetName = GetProcessNameFromPID2(record.targetPid);
+            std::string sourcePath = GetProcessFullPath(record.sourcePid);
+
+            if (IsTargetWatched(record.targetPid, userSpecifiedPid, targetName, userSpecifiedName)) {
+                bool canRead = (record.accessRights & PROCESS_VM_READ) != 0;
+                bool canWrite = (record.accessRights & PROCESS_VM_WRITE) != 0;
+                bool canCreateThread = (record.accessRights & PROCESS_CREATE_THREAD) != 0;
+
+                if (canRead || canWrite || canCreateThread) {
+                    ss << "[!] [TARGET MEMORY ACCESS DETECTED]" << std::endl;
+                    ss << "    -> Target: PID " << record.targetPid << " (" << targetName << ")" << std::endl;
+                    ss << "    -> Sleuth: PID " << record.sourcePid << " (" << sourceName << ")" << std::endl;
+                    ss << "    -> Path:   " << sourcePath << std::endl;
+                    ss << "    -> Rights: 0x" << std::hex << record.accessRights << std::dec;
+        
+                    if (canRead) ss << " [VM_READ (Memory Sucking?)]";
+                    if (canWrite) ss << " [VM_WRITE]";
+                    ss << std::endl << "--------------------------------------------------" << std::endl;
+                }
+            }
+        }
+
+        return ss.str();
+    };
+
+    auto ScanSystemMemoryAccess = [](std::vector<HandleAccessRecord> &har) {
+        std::ostringstream ss;
+        ss << "[*] Starting ScanSystemMemoryAccess." << std::endl;
+        HMODULE hNtdll = GetModuleHandleW(L"ntdll.dll");
+        if (!hNtdll) return ss.str();
+
+        auto NtQuerySysInfo = reinterpret_cast<pfnNtQuerySystemInformation>(GetProcAddress(hNtdll, "NtQuerySystemInformation"));
+        if (!NtQuerySysInfo) return ss.str();
+
+        ULONG bufferSize = 0x10000;
+        PVOID buffer = nullptr;
+        NTSTATUS status = 0;
+        do {
+            if (buffer) VirtualFree(buffer, 0, MEM_RELEASE);
+            buffer = VirtualAlloc(nullptr, bufferSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+            if (!buffer) return ss.str();
+
+            status = NtQuerySysInfo(SystemHandleInformation, buffer, bufferSize, &bufferSize);
+            if (status == STATUS_INFO_LENGTH_MISMATCH)
+                bufferSize *= 2;
+        } while (status == STATUS_INFO_LENGTH_MISMATCH);
+
+        if (!NT_SUCCESS(status)) {
+            if (buffer) VirtualFree(buffer, 0, MEM_RELEASE);
+            ss << "[-] NtQuerySystemInformation failed." << std::endl;
+            return ss.str();
+        }
+
+        const auto *handleInfo = reinterpret_cast<PSYSTEM_HANDLE_INFORMATION>(buffer);
+        ss << "[+] Total system handles to inspect: " << handleInfo->NumberOfHandles << std::endl;
+
+        std::vector<HandleAccessRecord> currentScan;
+        currentScan.reserve(10000);
+        const int limiter = 30;
+        int counter = 0;
+        for (ULONG i = 0; i < handleInfo->NumberOfHandles; ++i) {
+            HandleAccessRecord handleRecord;
+            const auto &entry = handleInfo->Handles[i];
+
+            DWORD sourcePid = handleRecord.sourcePid = entry.UniqueProcessId;
+            HANDLE hRemoteHandle = reinterpret_cast<HANDLE>(entry.HandleValue);
+            ULONG grantedAccess = handleRecord.accessRights = entry.GrantedAccess;
+            if (sourcePid == 0 || sourcePid == 4) continue;
+
+            HANDLE hTargetProcess = OpenProcess(PROCESS_DUP_HANDLE | PROCESS_QUERY_INFORMATION, FALSE, sourcePid);
+            if (!hTargetProcess) continue;
+
+            std::string typeName, objectName;
+            if (GetHandleDetails(hTargetProcess, hRemoteHandle, typeName, objectName)) {
+                if (typeName == "Process") {
+
+                    const bool canRead = (grantedAccess & PROCESS_VM_READ) != 0;
+                    const bool canWrite = (grantedAccess & PROCESS_VM_WRITE) != 0;
+                    //const bool canOperate = (grantedAccess & PROCESS_VM_OPERATION) != 0;
+                    const bool canCreateThread = (grantedAccess & PROCESS_CREATE_THREAD) != 0;
+                    const bool isFullAccess = (grantedAccess & 0x1F0FFF) == 0x1F0FFF;
+
+                    if (canRead || canWrite || canCreateThread || isFullAccess) {
+                        HANDLE hLocalDuplicate = nullptr;
+                        if (DuplicateHandle(hTargetProcess, hRemoteHandle, GetCurrentProcess(), &hLocalDuplicate, 0, FALSE, DUPLICATE_SAME_ACCESS)) {
+                            DWORD targetPid = handleRecord.targetPid = GetProcessId(hLocalDuplicate);
+                            CloseHandle(hLocalDuplicate);
+
+                            if (targetPid != 0 && targetPid != sourcePid) {
+                                std::string sourceName = GetProcessNameFromPID2(sourcePid);
+                                std::string targetName = GetProcessNameFromPID2(targetPid);
+                                std::string sourcePath = GetProcessFullPath(sourcePid);
+
+                                std::string threatLevel = "[INFO / Normal]";
+                                if (isFullAccess || canCreateThread || canWrite) {
+                                    threatLevel = "[!] [HIGH RISK] Potential Injection/Control!";
+                                } else if (canRead) {
+                                    threatLevel = "[!] [MEDIUM RISK] Memory Read Access";
+                                }
+
+                                ss << threatLevel << std::endl;
+                                ss << "    -> Source: PID " << sourcePid << " (" << sourceName << ")" << std::endl;
+                                ss << "    -> Path:   " << sourcePath << std::endl;
+                                ss << "    -> Target: PID " << targetPid << " (" << targetName << ")" << std::endl;
+                                ss << "    -> Rights: 0x" << std::hex << grantedAccess << std::dec;
+
+                                std::wcout << L" [ ";
+                                if (isFullAccess) ss << "ALL_ACCESS ";
+                                if (canCreateThread) ss << "CREATE_THREAD ";
+                                if (canWrite) ss << "VM_WRITE ";
+                                if (canRead) ss << "VM_READ ";
+                                ss << "]" << std::endl;
+                
+                                ss << "--------------------------------------------------" << std::endl;
+
+                                if(counter++ == limiter) {
+                                    CloseHandle(hTargetProcess);
+                                    break;
+                                }
+                                currentScan.push_back(handleRecord);
+                            }
+                        }
+                    }
+
+                    if ((grantedAccess & PROCESS_VM_READ) || (grantedAccess & 0x1F0FFF)) {
+                        HANDLE hLocalDuplicate = nullptr;
+                        if (DuplicateHandle(hTargetProcess, hRemoteHandle, GetCurrentProcess(), &hLocalDuplicate, 0, FALSE, DUPLICATE_SAME_ACCESS)) {
+                            DWORD targetPid = GetProcessId(hLocalDuplicate);
+                            CloseHandle(hLocalDuplicate);
+
+                            if (targetPid != 0 && targetPid != sourcePid) {
+                                std::string sourceName = GetProcessNameFromPID2(sourcePid);
+                                std::string targetName = GetProcessNameFromPID2(targetPid);
+
+                                ss << "[!] Cross-Process Memory Access Detected!" << std::endl;
+                                ss << "    -> Source: PID " << sourcePid << " (" << sourceName << ")" << std::endl;
+                                ss << "    -> Target: PID " << targetPid << " (" << targetName << ")" << std::endl;
+                                ss << "    -> Access Rights: 0x" << std::hex << grantedAccess << std::dec << std::endl;
+                                ss << "--------------------------------------------------" << std::endl;
+
+                                if(counter++ == limiter) {
+                                    CloseHandle(hTargetProcess);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            CloseHandle(hTargetProcess);
+        }
+
+        har = std::move(currentScan);
+
+        VirtualFree(buffer, 0, MEM_RELEASE);
+        return ss.str();
+    };
+
     wchar_t procNameBuf[256] = { 0 };
     GetWindowTextW(g_hEditProcessName, procNameBuf, 256);
     int32_t counter = 0;
     while (g_thread) {
         try {
-            LogEntry_R(std::string("PipeServerThread Counter: ") + std::to_string(counter++) + std::string("\r\n"));
+            LogEntry_R(std::string("Hook: PipeServerThread Counter: ") + std::to_string(counter++) + std::string("\r\n"));
         }
         catch (const std::string&) {}
         ::Sleep(500);
@@ -653,12 +562,41 @@ static void PipeServerThread() {
 }
 
 static void PipeServerThread2() {
+    auto RunDebuggerForensics = [](DWORD targetProcessId) {
+        std::ostringstream stream;
+        stream << "[*] Starting Debugger Forensics for PID: " << targetProcessId << std::endl;
+
+        HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, targetProcessId);
+        if (!hProcess) {
+            stream << "[-] Failed to open target process. Error: " << GetLastError() << std::endl;
+            return stream.str();
+        }
+
+        bool standardDbg = CheckStandardDebugger(hProcess);
+        bool portDbg = CheckDebugPort(hProcess);
+        bool objectDbg = CheckDebugObject(hProcess);
+
+        stream << "----------------------------------------" << std::endl;
+        stream << " [Check 1] Standard Remote Debugger : " << (standardDbg ? "[DETECTED]" : "Clean") << std::endl;
+        stream << " [Check 2] Native Debug Port (7)    : " << (portDbg ? "[DETECTED]" : "Clean") << std::endl;
+        stream << " [Check 3] Debug Object Handle (30) : " << (objectDbg ? "[DETECTED]" : "Clean") << std::endl;
+        stream << "----------------------------------------" << std::endl;
+
+        if (standardDbg || portDbg || objectDbg)
+            std::cout << "[!] WARNING: External debugging / memory inspection mechanism detected!" << std::endl;
+        else
+            std::cout << "[+] No active debugger hooks found via these vectors." << std::endl;
+
+        CloseHandle(hProcess);
+        return stream.str();
+    };
+
     wchar_t procNameBuf[256] = { 0 };
     GetWindowTextW(g_hEditProcessName, procNameBuf, 256);
     int32_t counter = 0;
     while (g_thread) {
         try {
-            LogEntry_R(std::string("PipeServerThread2 Counter: ") + std::to_string(counter++) + std::string("\r\n"));
+            LogEntry_R(std::string("DLL Injection: PipeServerThread2 Counter: ") + std::to_string(counter++) + std::string("\r\n"));
         }
         catch (const std::string&) {}
         ::Sleep(500);
@@ -674,18 +612,17 @@ static void PipeServerThread2() {
             0, nullptr
         );
         if (hPipe == INVALID_HANDLE_VALUE) {
-            LogEntry_L(std::string("hPipe: INVALID_HANDLE_VALUE\n\n"));
+            LogEntry_L(std::string("DLL Injection: hPipe INVALID_HANDLE_VALUE\n\n"));
             Sleep(500);
             continue;
         }
-
-        LogEntry_L(std::string("DLL Injection: PIPE Recive Loaded.\n\n"));
+        LogEntry_L(std::string("DLL Injection: PIPE Recive Loaded. Connecting hPipe ...\n\n"));
 
         if (ConnectNamedPipe(hPipe, nullptr) || GetLastError() == ERROR_PIPE_CONNECTED) {
             GuardianAlertEvent alert;
             DWORD bytesRead = 0;
 
-            LogEntry_L(std::string("ConnectNamedPipe: ReadFile\n"));
+            LogEntry_L(std::string("DLL Injection: ConnectNamedPipe ReadFile\n"));
             if (ReadFile(hPipe, &alert, sizeof(GuardianAlertEvent), &bytesRead, nullptr)) {
                 SYSTEMTIME st;
                 GetLocalTime(&st);
@@ -744,40 +681,14 @@ static void PipeServerThread2() {
                     LogEntry_L(WStringToString(ss.str()), logColor);
                 }
             }
+        } else {
+            LogEntry_L(std::string("DLL Injection: ConnectNamedPipe failure (No Connection).\n\n"));
         }
 
         DisconnectNamedPipe(hPipe);
         CloseHandle(hPipe);
         ::Sleep(500);
     }
-}
-
-static void AppendLogText(HWND hRichEdit, const std::wstring &text, COLORREF color) {
-    CHARFORMAT2W cf = {0};
-    cf.cbSize = sizeof(CHARFORMAT2W);
-    cf.dwMask = CFM_COLOR;
-    cf.crTextColor = color;
-    const int len = GetWindowTextLengthW(hRichEdit);
-
-    SendMessageW(hRichEdit, EM_SETSEL, (WPARAM)len, (LPARAM)len);
-    SendMessageW(hRichEdit, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&cf);
-    SendMessageW(hRichEdit, EM_REPLACESEL, FALSE, (LPARAM)text.c_str());
-    SendMessageW(hRichEdit, EM_SCROLLCARET, 0, 0);
-}
-
-static void AppendLogTextA(HWND hRichEdit, const std::string &textA, COLORREF color) {
-    CHARFORMAT2W cf = {0};
-    cf.cbSize = sizeof(CHARFORMAT2W);
-    cf.dwMask = CFM_COLOR;
-    cf.crTextColor = color;
-    const int len = GetWindowTextLengthW(hRichEdit);
-
-    std::wstring text = StringToWString(textA);
-
-    SendMessageW(hRichEdit, EM_SETSEL, (WPARAM)len, (LPARAM)len);
-    SendMessageW(hRichEdit, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&cf);
-    SendMessageW(hRichEdit, EM_REPLACESEL, FALSE, (LPARAM)text.c_str());
-    SendMessageW(hRichEdit, EM_SCROLLCARET, 0, 0);
 }
 
 static bool InjectGuardianCore(DWORD targetPid, const wchar_t *dllPath) {
@@ -818,6 +729,34 @@ static bool InjectGuardianCore(DWORD targetPid, const wchar_t *dllPath) {
 }
 
 static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    auto AppendLogTextW = [](HWND hRichEdit, const std::wstring &text, COLORREF color) {
+        CHARFORMAT2W cf = {0};
+        cf.cbSize = sizeof(CHARFORMAT2W);
+        cf.dwMask = CFM_COLOR;
+        cf.crTextColor = color;
+        const int len = GetWindowTextLengthW(hRichEdit);
+
+        SendMessageW(hRichEdit, EM_SETSEL, (WPARAM)len, (LPARAM)len);
+        SendMessageW(hRichEdit, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&cf);
+        SendMessageW(hRichEdit, EM_REPLACESEL, FALSE, (LPARAM)text.c_str());
+        SendMessageW(hRichEdit, EM_SCROLLCARET, 0, 0);
+    };
+
+    auto AppendLogTextA = [](HWND hRichEdit, const std::string &textA, COLORREF color) {
+        CHARFORMAT2W cf = {0};
+        cf.cbSize = sizeof(CHARFORMAT2W);
+        cf.dwMask = CFM_COLOR;
+        cf.crTextColor = color;
+        const int len = GetWindowTextLengthW(hRichEdit);
+
+        std::wstring text = StringToWString(textA);
+
+        SendMessageW(hRichEdit, EM_SETSEL, (WPARAM)len, (LPARAM)len);
+        SendMessageW(hRichEdit, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&cf);
+        SendMessageW(hRichEdit, EM_REPLACESEL, FALSE, (LPARAM)text.c_str());
+        SendMessageW(hRichEdit, EM_SCROLLCARET, 0, 0);
+    };
+
     static HWND hStatic = nullptr;
     static HWND hEditPid = nullptr;
     static HWND hBtnInject = nullptr;
@@ -825,6 +764,7 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
     static HWND hBtnAttachMain = nullptr;
     static HWND hLogEditLeft = nullptr;
     static HWND hLogEditRight = nullptr;
+
     auto InstanceCheck = []() {
         return hStatic && g_hEditProcessName && hEditPid && hBtnInject && hBtnInjectAll && hBtnAttachMain && hLogEditLeft && hLogEditRight;
     };
@@ -909,13 +849,13 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
         SendMessageW(hLogEditLeft, EM_SETCHARFORMAT, SCF_ALL, (LPARAM)&cf);
         SendMessageW(hLogEditRight, EM_SETCHARFORMAT, SCF_ALL, (LPARAM)&cf);
 
-        AppendLogText(hLogEditLeft, L"[OK] Initialization completed.\n", RGB(100, 200, 250));
-        AppendLogText(hLogEditLeft, L"[OK] Ready, AI Agent Memory Checker monitoring.\n\n", RGB(150, 150, 150));
+        AppendLogTextW(hLogEditLeft, L"[OK] Initialization completed.\n", RGB(100, 200, 250));
+        AppendLogTextW(hLogEditLeft, L"[OK] Ready, AI Agent Memory Checker monitoring.\n\n", RGB(150, 150, 150));
 
         g_thread = true;
         std::thread(PipeServerThread).detach();
         std::thread(PipeServerThread2).detach();
-        AppendLogText(hLogEditLeft, L"[OK] PipeServerThread listener initialized.\n\n", RGB(100, 200, 250));
+        AppendLogTextW(hLogEditLeft, L"[OK] PipeServerThread listener initialized.\n\n", RGB(100, 200, 250));
         break;
     }
 
@@ -932,7 +872,7 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
 
             std::wostringstream ss;
             ss << L"[+] Initiating monitoring on PID: " << pid << L"...\n";
-            AppendLogText(hLogEditLeft, ss.str(), RGB(100, 255, 100));
+            AppendLogTextW(hLogEditLeft, ss.str(), RGB(100, 255, 100));
             DisableButton();
         } 
         else if (LOWORD(wParam) == IDC_BTN_INJECT_ALL) {
@@ -949,7 +889,7 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
             if (pids.empty()) {
                 std::wostringstream ss;
                 ss << L"[-] No running instances found for: " << procNameBuf << L"\n";
-                AppendLogText(hLogEditLeft, ss.str(), RGB(255, 150, 0));
+                AppendLogTextW(hLogEditLeft, ss.str(), RGB(255, 150, 0));
                 break;
             }
 
@@ -959,26 +899,26 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
 
             std::wostringstream ssHeader;
             ssHeader << L"[+] Found " << pids.size() << L" process instance(s) for " << procNameBuf << L". Attaching...\n";
-            AppendLogText(hLogEditLeft, ssHeader.str(), RGB(100, 200, 250));
+            AppendLogTextW(hLogEditLeft, ssHeader.str(), RGB(100, 200, 250));
 
             size_t successCount = 0;
             for (DWORD pid : pids) {
                 if (InjectGuardianCore(pid, dllPath.c_str())) {
                     std::wostringstream ss;
                     ss << L"  „¥„Ÿ [OK] Attached to PID: " << pid << L"\n";
-                    AppendLogText(hLogEditLeft, ss.str(), RGB(100, 255, 100));
+                    AppendLogTextW(hLogEditLeft, ss.str(), RGB(100, 255, 100));
                     successCount++;
                 }
                 else {
                     std::wostringstream ss;
                     ss << L"  „¥„Ÿ [FAIL] Could not attach to PID: " << pid << L" (Check admin privileges)\n";
-                    AppendLogText(hLogEditLeft, ss.str(), RGB(255, 100, 100));
+                    AppendLogTextW(hLogEditLeft, ss.str(), RGB(255, 100, 100));
                 }
             }
 
             std::wostringstream ssFooter;
             ssFooter << L"[+] Monitoring activated on " << successCount << L"/" << pids.size() << L" process(es).\n\n";
-            AppendLogText(hLogEditLeft, ssFooter.str(), RGB(100, 255, 100));
+            AppendLogTextW(hLogEditLeft, ssFooter.str(), RGB(100, 255, 100));
             DisableButton();
         } else if (LOWORD(wParam) == IDC_BYN_ATTACH_MAIN) {
             char procNameBuf[256] = { 0 };
@@ -1013,7 +953,7 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
         const wchar_t *pText = reinterpret_cast<wchar_t *>(wParam);
         COLORREF color = static_cast<COLORREF>(lParam);
         if (pText) {
-            AppendLogText(hLogEditLeft, std::wstring(pText), color);
+            AppendLogTextW(hLogEditLeft, std::wstring(pText), color);
             delete [] pText;
         }
         break;
@@ -1033,7 +973,7 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
         const wchar_t* pText = reinterpret_cast<wchar_t*>(wParam);
         COLORREF color = static_cast<COLORREF>(lParam);
         if (pText) {
-            AppendLogText(hLogEditRight, std::wstring(pText), color);
+            AppendLogTextW(hLogEditRight, std::wstring(pText), color);
             delete[] pText;
         }
         break;
@@ -1080,7 +1020,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.86 - 9",
+        L"AI Agent Memory Checker v1.86 - 10",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr

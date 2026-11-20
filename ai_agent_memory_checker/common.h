@@ -124,6 +124,68 @@ inline std::vector<DWORD> GetPidsByProcessName(const std::wstring &processName) 
     return pids;
 }
 
+inline std::string GetProcessFullPath(DWORD pid) {
+    std::string path = "Unknown";
+    HANDLE hProc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+    if (hProc) {
+        WCHAR buffer[MAX_PATH];
+        DWORD size = MAX_PATH;
+        if (QueryFullProcessImageNameW(hProc, 0, buffer, &size)) {
+            path = WStringToString(std::wstring(buffer));
+        }
+        CloseHandle(hProc);
+    }
+    return path;
+}
+
+inline std::string GetProcessNameFromPID(DWORD processId) {
+    if (processId == 0) return "System Idle Process";
+    if (processId == 4) return "System";
+
+    HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId);
+    if (!hProcess) {
+        return "Unknown Process (Access Denied)";
+    }
+
+    WCHAR imagePath[MAX_PATH] = { 0 };
+    DWORD size = MAX_PATH;
+    std::string processName = "Unknown";
+
+    if (QueryFullProcessImageNameW(hProcess, 0, imagePath, &size)) {
+        std::wstring fullPath(imagePath);
+        size_t lastSlash = fullPath.find_last_of(L"\\/");
+        if (lastSlash != std::wstring::npos) {
+            std::wstring fileName = fullPath.substr(lastSlash + 1);
+            processName = WStringToString(fileName);
+        }
+    }
+
+    CloseHandle(hProcess);
+    return processName;
+}
+
+inline std::string GetProcessNameFromPID2(DWORD pid) {
+    if (pid == 0) return "System / Idle";
+
+    std::wstring procName = L"Unknown";
+    HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (hSnap != INVALID_HANDLE_VALUE) {
+        PROCESSENTRY32W pe;
+        pe.dwSize = sizeof(pe);
+        if (Process32FirstW(hSnap, &pe)) {
+            do {
+                if (pe.th32ProcessID == pid) {
+                    procName = pe.szExeFile;
+                    break;
+                }
+            } while (Process32NextW(hSnap, &pe));
+        }
+        CloseHandle(hSnap);
+    }
+
+    return WStringToString(procName);
+}
+
 /////// dll common below
 
 #define GUARDIAN_PIPE_NAME L"\\\\.\\pipe\\AIAgentMemoryCheckerPipe"
