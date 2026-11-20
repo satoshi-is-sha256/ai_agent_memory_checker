@@ -628,7 +628,7 @@ static void PipeServerThread() {
         catch (const std::string&) {}
         ::Sleep(500);
 
-        // LogQueueManager
+        // LogQueueManager [L] [R]
         try {
             {
                 std::vector<std::string> outLogs;
@@ -655,8 +655,15 @@ static void PipeServerThread() {
 static void PipeServerThread2() {
     wchar_t procNameBuf[256] = { 0 };
     GetWindowTextW(g_hEditProcessName, procNameBuf, 256);
+    int32_t counter = 0;
     while (g_thread) {
-        // DLL Injection: PIPE Recive
+        try {
+            LogEntry_R(std::string("PipeServerThread2 Counter: ") + std::to_string(counter++) + std::string("\r\n"));
+        }
+        catch (const std::string&) {}
+        ::Sleep(500);
+
+        // DLL Injection: PIPE Recive [L]
         HANDLE hPipe = CreateNamedPipeW(
             GUARDIAN_PIPE_NAME,
             PIPE_ACCESS_INBOUND,
