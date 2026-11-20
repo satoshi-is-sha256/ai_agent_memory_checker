@@ -477,6 +477,9 @@ static void PipeServerThread() {
     GetWindowTextW(g_hEditProcessName, procNameBuf, 256);
     int32_t counter = 0;
     while (g_thread) {
+        g_NtAlpcCreatePortLogs.clear();
+        g_NtAlpcCreatePortLogs.reserve(100000);
+
         try {
             LogEntry_R(std::string("Hook: PipeServerThread Counter: ") + std::to_string(counter++) + std::string("\r\n"));
         }
@@ -558,6 +561,9 @@ static void PipeServerThread() {
             }
         } catch (const std::string&) {}
         ::Sleep(500);
+
+        // g_NtAlpcCreatePortLogs [L]
+        LogEntry_L(g_NtAlpcCreatePortLogs);
     }
 }
 
@@ -1020,7 +1026,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.86 - 11",
+        L"AI Agent Memory Checker v1.86 - 12",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
@@ -1036,10 +1042,10 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 
 
     CAlpc::InitializeAlpcHooks();
-
-/**
     CCommonMemory::InitializeSectionHooks();
     CALPCBACK::InitializeNamedPipeHooks();
+
+/**
     CDiskIo::InitializeFileIoHooks();
     CNetwork::InitializeNetworkHooks();
     CProcessUser::InitializeProcessCreationHooks();
@@ -1084,10 +1090,10 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     }
 
     CAlpc::UninitializeAlpcHooks();
-
-/**
     CCommonMemory::UninitializeSectionHooks();
     CALPCBACK::UninitializeNamedPipeHooks();
+
+/**
     CDiskIo::UninitializeFileIoHooks();
     CNetwork::UninitializeNetworkHooks();
     CProcessUser::UninitializeProcessCreationHooks();
