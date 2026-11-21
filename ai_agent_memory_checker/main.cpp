@@ -1040,7 +1040,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     ShowWindow(g_hWnd, nCmdShow);
     UpdateWindow(g_hWnd);
 
-
     CAlpc::InitializeAlpcHooks();
     CCommonMemory::InitializeSectionHooks();
     CALPCBACK::InitializeNamedPipeHooks();
