@@ -1026,7 +1026,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.86 - 13",
+        L"AI Agent Memory Checker v1.86 - 14",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
@@ -1046,14 +1046,14 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CDiskIo::InitializeFileIoHooks();
     CNetwork::InitializeNetworkHooks();
     CProcessUser::InitializeProcessCreationHooks();
-
-/**
     CRegistryPersistence::InitializePersistenceHooks();
     CPortScan::InitializeLoopbackHooks();
     CCmdLine::InitializeCommandLineHooks();
     CCripBoard::InitializeClipboardHooks();
     CDnsResolution::InitializeDnsHooks();
     CFileDrop::InitializeFileDropHooks();
+
+/**
     CProcessInjection::InitializeInjectionHooks();
     CAntiDebugMonitor::InitializeAntiDebugHooks();
     CGlobalHookMonitor::InitializeGlobalHookHooks();
@@ -1094,14 +1094,14 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CDiskIo::UninitializeFileIoHooks();
     CNetwork::UninitializeNetworkHooks();
     CProcessUser::UninitializeProcessCreationHooks();
-
-/**
     CRegistryPersistence::UninitializePersistenceHooks();
     CPortScan::UninitializeLoopbackHooks();
     CCmdLine::UninitializeCommandLineHooks();
     CCripBoard::UninitializeClipboardHooks();
     CDnsResolution::UninitializeDnsHooks();
     CFileDrop::UninitializeFileDropHooks();
+
+/**
     CProcessInjection::UninitializeInjectionHooks();
     CAntiDebugMonitor::UninitializeAntiDebugHooks();
     CGlobalHookMonitor::UninitializeGlobalHookHooks();
