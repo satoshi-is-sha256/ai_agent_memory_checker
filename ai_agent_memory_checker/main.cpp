@@ -1026,7 +1026,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.86 - 16",
+        L"AI Agent Memory Checker v1.86 - 17",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
@@ -1063,14 +1063,14 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CRegistryPersistenceMonitor::InitializeRegistryPersistenceHooks();
     CHttpTrafficInspector::InitializeHttpTrafficHooks();
     CNamedPipeMonitor::InitializeNamedPipeHooks();
-
-/**
     CDllSideLoadingMonitor::InitializeDllSideLoadingHooks();
     CAmsiMonitor::InitializeAmsiHooks();
     CDriverLoadMonitor::InitializeDriverLoadHooks();
     CVirtualallocInjectionMonitor::InitializeProcessInjectionHooks();
     CRegistryRWMonitor::InitializeRegistryPersistenceHooks();
     CTokenPrivilegeMonitor::InitializeTokenPrivilegeHooks();
+
+/**
     CEventLogAudit::InitializeEventLogAuditHooks();
     CLsassProtectionAudit::InitializeLsassProtectionHooks();
     CDnsQueryAudit::InitializeDnsQueryAuditHooks();
@@ -1113,14 +1113,14 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CRegistryPersistenceMonitor::UninitializeRegistryPersistenceHooks();
     CHttpTrafficInspector::UninitializeHttpTrafficHooks();
     CNamedPipeMonitor::UninitializeNamedPipeHooks();
-
-/**
     CDllSideLoadingMonitor::UninitializeDllSideLoadingHooks();
     CAmsiMonitor::UninitializeAmsiHooks();
     CDriverLoadMonitor::UninitializeDriverLoadHooks();
     CVirtualallocInjectionMonitor::UninitializeProcessInjectionHooks();
     CRegistryRWMonitor::UninitializeRegistryPersistenceHooks();
     CTokenPrivilegeMonitor::UninitializeTokenPrivilegeHooks();
+
+/**
     CEventLogAudit::UninitializeEventLogAuditHooks();
     CLsassProtectionAudit::UninitializeLsassProtectionHooks();
     CDnsQueryAudit::UninitializeDnsQueryAuditHooks();
