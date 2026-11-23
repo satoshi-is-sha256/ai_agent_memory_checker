@@ -1026,7 +1026,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.86 - 17",
+        L"AI Agent Memory Checker v1.87",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
@@ -1069,8 +1069,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CVirtualallocInjectionMonitor::InitializeProcessInjectionHooks();
     CRegistryRWMonitor::InitializeRegistryPersistenceHooks();
     CTokenPrivilegeMonitor::InitializeTokenPrivilegeHooks();
-
-/**
     CEventLogAudit::InitializeEventLogAuditHooks();
     CLsassProtectionAudit::InitializeLsassProtectionHooks();
     CDnsQueryAudit::InitializeDnsQueryAuditHooks();
@@ -1080,8 +1078,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CMemoryInjectionAudit::InitializeMemoryInjectionAudit();
 
     CTelemetryServer::GetInstance().Start();
-**/
-
     LogEntry_L(std::string("Hooked: All Instances.\n\n"));
 
     MSG msg;
@@ -1119,8 +1115,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CVirtualallocInjectionMonitor::UninitializeProcessInjectionHooks();
     CRegistryRWMonitor::UninitializeRegistryPersistenceHooks();
     CTokenPrivilegeMonitor::UninitializeTokenPrivilegeHooks();
-
-/**
     CEventLogAudit::UninitializeEventLogAuditHooks();
     CLsassProtectionAudit::UninitializeLsassProtectionHooks();
     CDnsQueryAudit::UninitializeDnsQueryAuditHooks();
@@ -1130,8 +1124,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CMemoryInjectionAudit::UninitializeMemoryInjectionAudit();
 
     CTelemetryServer::GetInstance().Stop();
-**/
-
     UnregisterClassW(wc.lpszClassName, wc.hInstance);
+
     return static_cast<int>(msg.wParam);
 }
