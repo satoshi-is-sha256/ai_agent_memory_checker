@@ -1026,7 +1026,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     g_hWnd = CreateWindowExW(
         0,
         L"AIAgentMemoryCheckerClass",
-        L"AI Agent Memory Checker v1.86 - 14",
+        L"AI Agent Memory Checker v1.86 - 15",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 1350, 520,
         nullptr, nullptr, hInstance, nullptr
@@ -1052,13 +1052,13 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CCripBoard::InitializeClipboardHooks();
     CDnsResolution::InitializeDnsHooks();
     CFileDrop::InitializeFileDropHooks();
-
-/**
     CProcessInjection::InitializeInjectionHooks();
     CAntiDebugMonitor::InitializeAntiDebugHooks();
     CGlobalHookMonitor::InitializeGlobalHookHooks();
     CCryptoPapiMonitor::InitializeDpapiHooks();
     CComObjectMonitor::InitializeComHooks();
+
+/**
     CHandleAccessMonitor::InitializeHandleAuditHooks();
     CFileIoDropperMonitor::InitializeFileIoHooks();
     CDllLoadMonitor::InitializeDllLoadHooks();
@@ -1082,6 +1082,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CTelemetryServer::GetInstance().Start();
 **/
 
+    LogEntry_L(std::string("Hooked: All Instances.\n\n"));
+
     MSG msg;
     while (GetMessageW(&msg, nullptr, 0, 0)) {
         TranslateMessage(&msg);
@@ -1100,13 +1102,13 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CCripBoard::UninitializeClipboardHooks();
     CDnsResolution::UninitializeDnsHooks();
     CFileDrop::UninitializeFileDropHooks();
-
-/**
     CProcessInjection::UninitializeInjectionHooks();
     CAntiDebugMonitor::UninitializeAntiDebugHooks();
     CGlobalHookMonitor::UninitializeGlobalHookHooks();
     CCryptoPapiMonitor::UninitializeDpapiHooks();
     CComObjectMonitor::UninitializeComHooks();
+
+/**
     CHandleAccessMonitor::UninitializeHandleAuditHooks();
     CFileIoDropperMonitor::UninitializeFileIoHooks();
     CDllLoadMonitor::UninitializeDllLoadHooks();
